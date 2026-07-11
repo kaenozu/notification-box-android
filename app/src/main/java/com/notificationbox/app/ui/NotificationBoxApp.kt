@@ -5,7 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun NotificationBoxApp(vm: NotificationBoxViewModel = viewModel()) {
+fun NotificationBoxApp(
+    factory: NotificationBoxViewModelFactory,
+    vm: NotificationBoxViewModel = viewModel(factory = factory)
+) {
     MaterialTheme {
         NotificationBoxScreen(vm)
     }

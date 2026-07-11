@@ -1,6 +1,9 @@
 package com.notificationbox.app.ui
 
+import android.Manifest
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,12 +33,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.notificationbox.app.BuildConfig
 import com.notificationbox.app.model.AppMode
 import com.notificationbox.app.model.NotificationDecision
 
@@ -43,9 +51,28 @@ import com.notificationbox.app.model.NotificationDecision
 @Composable
 fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     val context = LocalContext.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val openListenerSettings = remember(context) { notificationListenerSettingsIntent(context) }
     val openAppNotificationSettings = remember(context) { appNotificationSettingsIntent(context) }
+
+    val postNotificationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        vm.refreshPermissions()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                vm.refreshPermissions()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("通知箱") }) }
@@ -65,16 +92,18 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         Text("一時停止: ${state.pausedUntilText}")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = {
-                                vm.enableNotificationAccess()
                                 context.startActivity(openListenerSettings)
                             }) { Text("通知アクセス") }
                             Button(onClick = {
-                                vm.enablePostNotifications()
-                                if (Build.VERSION.SDK_INT >= 33) {
+                                if (Build.VERSION.SDK_INT >= 33 && !state.postNotificationsGranted) {
+                                    postNotificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
                                     context.startActivity(openAppNotificationSettings)
                                 }
                             }) { Text("通知許可") }
-                            Button(onClick = vm::seed) { Text("デモ追加") }
+                            if (BuildConfig.DEBUG) {
+                                Button(onClick = vm::seed) { Text("デモ追加") }
+                            }
                             Button(onClick = vm::clearAll) { Text("全消去") }
                         }
                     }
@@ -122,6 +151,22 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         }
                         Text(item.reason)
                         Text("判定: ${item.category} / 固定: ${if (item.userPinned) "あり" else "なし"}")
+                    }
+                }
+            }
+            if (state.items.isEmpty()) {
+                item {
+                    Card {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("通知がありません", style = MaterialTheme.typography.titleMedium)
+                            Text("通知アクセスを許可すると、ここに履歴が表示されます")
+                        }
                     }
                 }
             }

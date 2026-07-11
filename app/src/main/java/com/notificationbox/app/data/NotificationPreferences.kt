@@ -1,7 +1,6 @@
 package com.notificationbox.app.data
 
 import android.content.Context
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -26,8 +25,6 @@ object NotificationPreferences {
 
     private val modeKey = stringPreferencesKey("mode")
     private val pausedTextKey = stringPreferencesKey("paused_text")
-    private val listenerGrantedKey = booleanPreferencesKey("listener_granted")
-    private val postGrantedKey = booleanPreferencesKey("post_granted")
     private val digestHour1Key = intPreferencesKey("digest_hour_1")
     private val digestHour2Key = intPreferencesKey("digest_hour_2")
     private val digestHour3Key = intPreferencesKey("digest_hour_3")
@@ -57,15 +54,6 @@ object NotificationPreferences {
     fun savePausedText(text: String) {
         scope.launch {
             requireContext().notificationPrefsDataStore.edit { it[pausedTextKey] = text }
-        }
-    }
-
-    fun savePermissions(listenerGranted: Boolean, postGranted: Boolean) {
-        scope.launch {
-            requireContext().notificationPrefsDataStore.edit {
-            it[listenerGrantedKey] = listenerGranted
-            it[postGrantedKey] = postGranted
-            }
         }
     }
 
