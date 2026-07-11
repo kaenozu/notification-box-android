@@ -128,9 +128,9 @@ class RoomNotificationRepositoryTest {
 
         val stats = repository.observeClassificationStats().first()
 
-        assertEquals(2, stats.automaticallyClassified)
-        assertEquals(1, stats.automaticByDecision[NotificationDecision.KeepNow])
-        assertEquals(1, stats.automaticByDecision[NotificationDecision.Ignore])
+        assertEquals(2L, stats.automaticallyClassified)
+        assertEquals(1L, stats.automaticByDecision[NotificationDecision.KeepNow])
+        assertEquals(1L, stats.automaticByDecision[NotificationDecision.Ignore])
     }
 
     @Test
@@ -145,11 +145,11 @@ class RoomNotificationRepositoryTest {
 
         val stats = repository.observeClassificationStats().first()
 
-        assertEquals(1, stats.userOverrideChanges)
-        assertEquals(1, stats.appRuleChanges)
-        assertEquals(2, stats.appChangeCounts["com.example.app"])
-        assertEquals(1, stats.selectedByDecision[NotificationDecision.KeepNow])
-        assertEquals(1, stats.selectedByDecision[NotificationDecision.Ignore])
+        assertEquals(1L, stats.userOverrideChanges)
+        assertEquals(1L, stats.appRuleChanges)
+        assertEquals(2L, stats.appChangeCounts["com.example.app"])
+        assertEquals(1L, stats.selectedByDecision[NotificationDecision.KeepNow])
+        assertEquals(1L, stats.selectedByDecision[NotificationDecision.Ignore])
     }
 
     @Test
