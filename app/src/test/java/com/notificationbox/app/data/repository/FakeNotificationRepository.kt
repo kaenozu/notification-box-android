@@ -194,7 +194,7 @@ class FakeNotificationRepository : NotificationRepository {
         source: DecisionSource
     ): String = when (source) {
         DecisionSource.Automatic -> automaticReason
-        DecisionSource.AppRule -> "$appLabelを「${decision.name}」に設定済み"
+        DecisionSource.AppRule -> "${appLabel}を「${decision.name}」に設定済み"
         DecisionSource.UserOverride -> "ユーザーがこの通知を「${decision.name}」に変更"
     }
 }
