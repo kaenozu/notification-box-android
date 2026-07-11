@@ -63,6 +63,9 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
     val openListenerSettings = remember(context) { notificationListenerSettingsIntent(context) }
     val openAppNotificationSettings = remember(context) { appNotificationSettingsIntent(context) }
+    val filteredItems = remember(state.items, state.selectedFilter) {
+        state.items.filter { state.selectedFilter == null || it.category == state.selectedFilter }
+    }
 
     val postNotificationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -192,7 +195,7 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                 }
             }
             items(
-                items = state.items.filter { state.selectedFilter == null || it.category == state.selectedFilter },
+                items = filteredItems,
                 key = { it.key }
             ) { item ->
                 Card {
@@ -224,7 +227,7 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                     }
                 }
             }
-            if (state.items.isEmpty()) {
+            if (filteredItems.isEmpty()) {
                 item {
                     Card {
                         Column(
@@ -234,8 +237,13 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("通知がありません", style = MaterialTheme.typography.titleMedium)
-                            Text("通知アクセスを許可すると、ここに履歴が表示されます")
+                            if (state.items.isEmpty()) {
+                                Text("通知がありません", style = MaterialTheme.typography.titleMedium)
+                                Text("通知アクセスを許可すると、ここに履歴が表示されます")
+                            } else {
+                                Text("この分類の通知はありません", style = MaterialTheme.typography.titleMedium)
+                                Text("別の分類を選ぶと、保存済みの通知を確認できます")
+                            }
                         }
                     }
                 }
