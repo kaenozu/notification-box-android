@@ -80,7 +80,7 @@ class NotificationDaoTest {
 
         val stored = dao.getByKey("removed")
         assertFalse(stored?.isActive ?: true)
-        assertEquals(500, stored?.removedAtMillis)
+        assertEquals(500L, stored?.removedAtMillis)
     }
 
     @Test
