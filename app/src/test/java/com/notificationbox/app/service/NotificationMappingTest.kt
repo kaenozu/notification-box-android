@@ -2,7 +2,7 @@ package com.notificationbox.app.service
 
 import android.app.Notification
 import android.content.Context
-import android.os.UserHandle
+import android.os.Process
 import android.service.notification.StatusBarNotification
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
@@ -101,9 +101,9 @@ class NotificationMappingTest {
             tag,
             1000,
             1000,
+            0,
             notification,
-            UserHandle.of(0),
-            null,
+            Process.myUserHandle(),
             postTime
         )
     }
