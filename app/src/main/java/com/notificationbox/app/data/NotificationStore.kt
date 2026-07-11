@@ -27,6 +27,10 @@ object NotificationStore {
         NotificationPreferences.saveMode(mode.name)
     }
 
+    fun setModeForTesting(mode: AppMode) {
+        _state.update { it.copy(mode = mode) }
+    }
+
     fun setFilter(filter: NotificationDecision?) {
         _state.update { it.copy(selectedFilter = filter) }
     }

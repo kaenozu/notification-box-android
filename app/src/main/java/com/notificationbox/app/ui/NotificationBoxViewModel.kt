@@ -19,20 +19,35 @@ class NotificationBoxViewModel(
     private val permissionProvider: PermissionStatusProvider
 ) : ViewModel() {
 
-    private val permissionRefreshTrigger = MutableStateFlow(0)
+    data class PermissionState(
+        val notificationAccessGranted: Boolean,
+        val postNotificationsGranted: Boolean
+    )
 
-    val state: StateFlow<AppState> = combine(
-        NotificationStore.state,
-        permissionRefreshTrigger
-    ) { storeState, _ ->
-        storeState.copy(
+    private val _permissionState = MutableStateFlow(
+        PermissionState(
             notificationAccessGranted = permissionProvider.isNotificationListenerGranted(),
             postNotificationsGranted = permissionProvider.canPostNotifications()
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppState())
+    )
+
+    val permissionState: StateFlow<PermissionState> = _permissionState
+
+    val state: StateFlow<AppState> = combine(
+        NotificationStore.state,
+        _permissionState
+    ) { storeState, permissions ->
+        storeState.copy(
+            notificationAccessGranted = permissions.notificationAccessGranted,
+            postNotificationsGranted = permissions.postNotificationsGranted
+        )
+    }.stateIn(viewModelScope, SharingStarted.Lazily, AppState())
 
     fun refreshPermissions() {
-        permissionRefreshTrigger.value = permissionRefreshTrigger.value + 1
+        _permissionState.value = PermissionState(
+            notificationAccessGranted = permissionProvider.isNotificationListenerGranted(),
+            postNotificationsGranted = permissionProvider.canPostNotifications()
+        )
     }
 
     fun setMode(mode: AppMode) = NotificationStore.setMode(mode)
