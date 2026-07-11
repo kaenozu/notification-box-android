@@ -3,8 +3,10 @@ package com.notificationbox.app.service
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.notificationbox.app.App
+import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
 import java.time.Clock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,10 +34,10 @@ class NotificationRelayService : NotificationListenerService() {
             activeNotifications?.toList().orEmpty()
         }.getOrNull() ?: return
 
-        val records = currentNotifications.mapNotNull(recordFactory::create)
+        val records = currentNotifications.mapNotNull(::createRecordSafely)
         val synchronizedAtMillis = clock.millis()
-        serviceScope.launch {
-            repository.synchronizeActive(records, synchronizedAtMillis)
+        launchRepositoryOperation {
+            synchronizeActive(records, synchronizedAtMillis)
         }
     }
 
@@ -45,8 +47,9 @@ class NotificationRelayService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-        serviceScope.launch {
-            repository.markRemoved(sbn.key, clock.millis())
+        val removedAtMillis = clock.millis()
+        launchRepositoryOperation {
+            markRemoved(sbn.key, removedAtMillis)
         }
     }
 
@@ -56,9 +59,26 @@ class NotificationRelayService : NotificationListenerService() {
     }
 
     private fun persistPosted(sbn: StatusBarNotification) {
-        val record = recordFactory.create(sbn) ?: return
+        val record = createRecordSafely(sbn) ?: return
+        launchRepositoryOperation {
+            upsert(record)
+        }
+    }
+
+    private fun createRecordSafely(sbn: StatusBarNotification): NotificationRecord? =
+        runCatching { recordFactory.create(sbn) }.getOrNull()
+
+    private fun launchRepositoryOperation(
+        operation: suspend NotificationRepository.() -> Unit
+    ) {
         serviceScope.launch {
-            repository.upsert(record)
+            try {
+                repository.operation()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // Notification contents are deliberately not logged.
+            }
         }
     }
 }
