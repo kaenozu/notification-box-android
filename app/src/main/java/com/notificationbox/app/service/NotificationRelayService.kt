@@ -34,10 +34,15 @@ class NotificationRelayService : NotificationListenerService() {
             activeNotifications?.toList().orEmpty()
         }.getOrNull() ?: return
 
+        val activeKeys = currentNotifications
+            .asSequence()
+            .filterNot { it.packageName == packageName }
+            .map(StatusBarNotification::getKey)
+            .toSet()
         val records = currentNotifications.mapNotNull(::createRecordSafely)
         val synchronizedAtMillis = clock.millis()
         launchRepositoryOperation {
-            synchronizeActive(records, synchronizedAtMillis)
+            synchronizeActive(activeKeys, records, synchronizedAtMillis)
         }
     }
 
