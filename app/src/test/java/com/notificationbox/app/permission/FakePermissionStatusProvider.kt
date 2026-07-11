@@ -1,13 +1,27 @@
 package com.notificationbox.app.permission
 
-class FakePermissionStatusProvider(
-    private val platform: FakeNotificationPermissionPlatform = FakeNotificationPermissionPlatform()
-) : PermissionStatusProvider {
+class FakePermissionStatusProvider : PermissionStatusProvider {
+    var listenerGranted = false
+    var postNotificationsGranted = false
 
-    override fun isNotificationListenerGranted(): Boolean = platform.isNotificationListenerGranted()
-    override fun canPostNotifications(): Boolean = platform.hasPostNotificationsPermission() && platform.areNotificationsEnabled()
+    var listenerCallCount = 0
+        private set
 
-    fun setListenerGranted(granted: Boolean) { platform.enabledListenerPackages = if (granted) setOf(platform.packageName) else emptySet() }
-    fun setPostNotificationsPermission(granted: Boolean) { platform.hasPostNotificationsPermission = granted }
-    fun setNotificationsEnabled(enabled: Boolean) { platform.areNotificationsEnabled = enabled }
+    var postCallCount = 0
+        private set
+
+    override fun isNotificationListenerGranted(): Boolean {
+        listenerCallCount++
+        return listenerGranted
+    }
+
+    override fun canPostNotifications(): Boolean {
+        postCallCount++
+        return postNotificationsGranted
+    }
+
+    fun resetCallCounts() {
+        listenerCallCount = 0
+        postCallCount = 0
+    }
 }

@@ -15,11 +15,6 @@ class AndroidNotificationPermissionPlatform(
 
     override val packageName: String = app.packageName
 
-    override fun isNotificationListenerGranted(): Boolean {
-        val packages = NotificationManagerCompat.getEnabledListenerPackages(app)
-        return packages.contains(app.packageName)
-    }
-
     override fun hasPostNotificationsPermission(): Boolean {
         if (Build.VERSION.SDK_INT >= 33) {
             return ContextCompat.checkSelfPermission(app, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -30,5 +25,9 @@ class AndroidNotificationPermissionPlatform(
 
     override fun areNotificationsEnabled(): Boolean {
         return NotificationManagerCompat.from(app).areNotificationsEnabled()
+    }
+
+    override fun enabledListenerPackages(): Set<String> {
+        return NotificationManagerCompat.getEnabledListenerPackages(app).toSet()
     }
 }

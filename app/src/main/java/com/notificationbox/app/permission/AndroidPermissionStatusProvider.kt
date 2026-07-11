@@ -5,7 +5,7 @@ class AndroidPermissionStatusProvider(
 ) : PermissionStatusProvider {
 
     override fun isNotificationListenerGranted(): Boolean {
-        return platform.isNotificationListenerGranted()
+        return platform.enabledListenerPackages().contains(platform.packageName)
     }
 
     override fun canPostNotifications(): Boolean {

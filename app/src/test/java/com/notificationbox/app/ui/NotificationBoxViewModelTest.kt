@@ -1,8 +1,6 @@
 package com.notificationbox.app.ui
 
-import com.notificationbox.app.data.NotificationStore
 import com.notificationbox.app.model.AppMode
-import com.notificationbox.app.permission.FakeNotificationPermissionPlatform
 import com.notificationbox.app.permission.FakePermissionStatusProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -23,14 +21,12 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class NotificationBoxViewModelTest {
 
-    private val fakePlatform = FakeNotificationPermissionPlatform()
-    private val fakeProvider = FakePermissionStatusProvider(fakePlatform)
+    private val fakeProvider = FakePermissionStatusProvider()
     private lateinit var viewModel: NotificationBoxViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        NotificationStore.clearAll()
         viewModel = NotificationBoxViewModel(fakeProvider)
     }
 
@@ -41,9 +37,8 @@ class NotificationBoxViewModelTest {
 
     @Test
     fun `when both permissions false, state reflects false`() = runTest {
-        fakeProvider.setListenerGranted(false)
-        fakeProvider.setPostNotificationsPermission(false)
-        fakeProvider.setNotificationsEnabled(false)
+        fakeProvider.listenerGranted = false
+        fakeProvider.postNotificationsGranted = false
 
         viewModel.refreshPermissions()
         advanceUntilIdle()
@@ -55,9 +50,8 @@ class NotificationBoxViewModelTest {
 
     @Test
     fun `when listener true and post false, state is correct`() = runTest {
-        fakeProvider.setListenerGranted(true)
-        fakeProvider.setPostNotificationsPermission(false)
-        fakeProvider.setNotificationsEnabled(false)
+        fakeProvider.listenerGranted = true
+        fakeProvider.postNotificationsGranted = false
 
         viewModel.refreshPermissions()
         advanceUntilIdle()
@@ -68,10 +62,9 @@ class NotificationBoxViewModelTest {
     }
 
     @Test
-    fun `when listener false, post permission true and enabled true, state is correct`() = runTest {
-        fakeProvider.setListenerGranted(false)
-        fakeProvider.setPostNotificationsPermission(true)
-        fakeProvider.setNotificationsEnabled(true)
+    fun `when listener false, post permission true, state is correct`() = runTest {
+        fakeProvider.listenerGranted = false
+        fakeProvider.postNotificationsGranted = true
 
         viewModel.refreshPermissions()
         advanceUntilIdle()
@@ -83,9 +76,8 @@ class NotificationBoxViewModelTest {
 
     @Test
     fun `when both permissions true, state reflects true`() = runTest {
-        fakeProvider.setListenerGranted(true)
-        fakeProvider.setPostNotificationsPermission(true)
-        fakeProvider.setNotificationsEnabled(true)
+        fakeProvider.listenerGranted = true
+        fakeProvider.postNotificationsGranted = true
 
         viewModel.refreshPermissions()
         advanceUntilIdle()
@@ -97,36 +89,33 @@ class NotificationBoxViewModelTest {
 
     @Test
     fun `permission refresh after revocation changes state`() = runTest {
-        fakeProvider.setListenerGranted(true)
-        fakeProvider.setPostNotificationsPermission(true)
-        fakeProvider.setNotificationsEnabled(true)
+        fakeProvider.listenerGranted = true
+        fakeProvider.postNotificationsGranted = true
         viewModel.refreshPermissions()
         advanceUntilIdle()
         assertEquals(true, viewModel.state.first().notificationAccessGranted)
 
-        fakeProvider.setListenerGranted(false)
+        fakeProvider.listenerGranted = false
         viewModel.refreshPermissions()
         advanceUntilIdle()
         assertEquals(false, viewModel.state.first().notificationAccessGranted)
     }
 
-@Test
+    @Test
     fun `permission changes do not corrupt other state fields`() = runTest {
-        NotificationStore.setModeForTesting(AppMode.Active)
-        fakeProvider.setListenerGranted(true)
+        fakeProvider.listenerGranted = true
         viewModel.refreshPermissions()
         advanceUntilIdle()
 
         val state = viewModel.state.first()
         assertEquals(true, state.notificationAccessGranted)
-        assertEquals(AppMode.Active, state.mode)
+        assertEquals(AppMode.Observation, state.mode)
     }
 
     @Test
     fun `only opening settings does not grant permission`() = runTest {
-        fakeProvider.setListenerGranted(false)
-        fakeProvider.setPostNotificationsPermission(false)
-        fakeProvider.setNotificationsEnabled(false)
+        fakeProvider.listenerGranted = false
+        fakeProvider.postNotificationsGranted = false
         viewModel.refreshPermissions()
         advanceUntilIdle()
 
@@ -144,7 +133,7 @@ class NotificationBoxViewModelTest {
         assertEquals(1, viewModel.state.first().items.size)
 
         // Change permission - should NOT trigger extra Provider calls beyond refreshPermissions
-        fakeProvider.setListenerGranted(true)
+        fakeProvider.listenerGranted = true
         viewModel.refreshPermissions()
         advanceUntilIdle()
 
@@ -152,5 +141,50 @@ class NotificationBoxViewModelTest {
         val state = viewModel.state.first()
         assertEquals(true, state.notificationAccessGranted)
         assertEquals(1, state.items.size)
+    }
+
+    @Test
+    fun `provider call counts are tracked correctly`() = runTest {
+        // Initialization (in @Before setup) calls both methods once
+        assertEquals(1, fakeProvider.listenerCallCount)
+        assertEquals(1, fakeProvider.postCallCount)
+
+        // refreshPermissions: should call both again
+        fakeProvider.resetCallCounts()
+        viewModel.refreshPermissions()
+        advanceUntilIdle()
+        assertEquals(1, fakeProvider.listenerCallCount)
+        assertEquals(1, fakeProvider.postCallCount)
+
+        // Store updates should NOT call Provider
+        fakeProvider.resetCallCounts()
+        viewModel.ingestDemo("com.test", "title", "text")
+        advanceUntilIdle()
+        assertEquals(0, fakeProvider.listenerCallCount)
+        assertEquals(0, fakeProvider.postCallCount)
+
+        fakeProvider.resetCallCounts()
+        viewModel.setFilter(null)
+        advanceUntilIdle()
+        assertEquals(0, fakeProvider.listenerCallCount)
+        assertEquals(0, fakeProvider.postCallCount)
+
+        fakeProvider.resetCallCounts()
+        viewModel.togglePinned(1L, true)
+        advanceUntilIdle()
+        assertEquals(0, fakeProvider.listenerCallCount)
+        assertEquals(0, fakeProvider.postCallCount)
+
+        fakeProvider.resetCallCounts()
+        viewModel.delete(1L)
+        advanceUntilIdle()
+        assertEquals(0, fakeProvider.listenerCallCount)
+        assertEquals(0, fakeProvider.postCallCount)
+
+        fakeProvider.resetCallCounts()
+        viewModel.clearAll()
+        advanceUntilIdle()
+        assertEquals(0, fakeProvider.listenerCallCount)
+        assertEquals(0, fakeProvider.postCallCount)
     }
 }

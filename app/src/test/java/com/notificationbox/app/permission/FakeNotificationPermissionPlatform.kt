@@ -7,7 +7,7 @@ class FakeNotificationPermissionPlatform : NotificationPermissionPlatform {
     var areNotificationsEnabled: Boolean = false
     var enabledListenerPackages: Set<String> = emptySet()
 
-    override fun isNotificationListenerGranted(): Boolean = enabledListenerPackages.contains(packageName)
     override fun hasPostNotificationsPermission(): Boolean = hasPostNotificationsPermission
     override fun areNotificationsEnabled(): Boolean = areNotificationsEnabled
+    override fun enabledListenerPackages(): Set<String> = enabledListenerPackages
 }
