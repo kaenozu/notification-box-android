@@ -39,3 +39,11 @@ jobs:
 
       - name: Assemble debug
         run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Room schema
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schema
+          path: app/schemas
+          if-no-files-found: warn
