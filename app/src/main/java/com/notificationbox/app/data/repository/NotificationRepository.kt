@@ -26,6 +26,7 @@ interface NotificationRepository {
     suspend fun upsert(notification: NotificationRecord)
 
     suspend fun synchronizeActive(
+        activeKeys: Set<String>,
         notifications: List<NotificationRecord>,
         synchronizedAtMillis: Long
     )
