@@ -1,0 +1,53 @@
+package com.notificationbox.app.data.db
+
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface NotificationDao {
+    @Query("SELECT * FROM notifications ORDER BY postTimeMillis DESC, `key` DESC")
+    fun observeAll(): Flow<List<NotificationEntity>>
+
+    @Query("SELECT * FROM notifications WHERE `key` = :key LIMIT 1")
+    suspend fun getByKey(key: String): NotificationEntity?
+
+    @Query("SELECT * FROM notifications ORDER BY postTimeMillis DESC, `key` DESC")
+    suspend fun getAllOnce(): List<NotificationEntity>
+
+    @Query("SELECT COUNT(*) FROM notifications")
+    suspend fun count(): Int
+
+    @Upsert
+    suspend fun upsert(entity: NotificationEntity)
+
+    @Query("UPDATE notifications SET userPinned = :pinned WHERE `key` = :key")
+    suspend fun setPinned(key: String, pinned: Boolean): Int
+
+    @Query("UPDATE notifications SET isActive = 0, removedAtMillis = :removedAtMillis WHERE `key` = :key")
+    suspend fun markRemoved(key: String, removedAtMillis: Long): Int
+
+    @Query("DELETE FROM notifications WHERE `key` = :key")
+    suspend fun deleteByKey(key: String): Int
+
+    @Query("DELETE FROM notifications")
+    suspend fun clearAll()
+
+    @Query("DELETE FROM notifications WHERE userPinned = 0 AND postTimeMillis < :cutoffMillis")
+    suspend fun deleteExpired(cutoffMillis: Long): Int
+
+    @Query(
+        """
+        DELETE FROM notifications
+        WHERE `key` IN (
+            SELECT `key`
+            FROM notifications
+            WHERE userPinned = 0
+            ORDER BY postTimeMillis ASC, `key` ASC
+            LIMIT MAX((SELECT COUNT(*) FROM notifications) - :maxCount, 0)
+        )
+        """
+    )
+    suspend fun pruneToMaximum(maxCount: Int): Int
+}
