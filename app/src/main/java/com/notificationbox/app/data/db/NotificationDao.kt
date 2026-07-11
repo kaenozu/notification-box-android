@@ -28,6 +28,18 @@ interface NotificationDao {
     @Query("UPDATE notifications SET isActive = 0, removedAtMillis = :removedAtMillis WHERE `key` = :key")
     suspend fun markRemoved(key: String, removedAtMillis: Long): Int
 
+    @Query("UPDATE notifications SET isActive = 0, removedAtMillis = :removedAtMillis WHERE isActive = 1")
+    suspend fun markAllActiveRemoved(removedAtMillis: Long): Int
+
+    @Query(
+        """
+        UPDATE notifications
+        SET isActive = 0, removedAtMillis = :removedAtMillis
+        WHERE isActive = 1 AND `key` NOT IN (:activeKeys)
+        """
+    )
+    suspend fun markActiveMissing(activeKeys: List<String>, removedAtMillis: Long): Int
+
     @Query("DELETE FROM notifications WHERE `key` = :key")
     suspend fun deleteByKey(key: String): Int
 
