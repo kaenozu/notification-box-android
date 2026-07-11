@@ -99,6 +99,7 @@ class RoomNotificationRepositoryTest {
         repository.upsert(record(key = "present", title = "before"))
 
         repository.synchronizeActive(
+            activeKeys = setOf("present"),
             notifications = listOf(record(key = "present", title = "after")),
             synchronizedAtMillis = nowMillis
         )
@@ -113,11 +114,28 @@ class RoomNotificationRepositoryTest {
     }
 
     @Test
+    fun `active key without a parsed record remains active`() = runTest {
+        repository.upsert(record(key = "unparseable"))
+
+        repository.synchronizeActive(
+            activeKeys = setOf("unparseable"),
+            notifications = emptyList(),
+            synchronizedAtMillis = nowMillis
+        )
+
+        assertTrue(database.notificationDao().getByKey("unparseable")?.isActive == true)
+    }
+
+    @Test
     fun `empty active synchronization marks every active row removed`() = runTest {
         repository.upsert(record(key = "one"))
         repository.upsert(record(key = "two"))
 
-        repository.synchronizeActive(emptyList(), synchronizedAtMillis = nowMillis)
+        repository.synchronizeActive(
+            activeKeys = emptySet(),
+            notifications = emptyList(),
+            synchronizedAtMillis = nowMillis
+        )
 
         assertTrue(database.notificationDao().getAllOnce().all { !it.isActive })
     }
