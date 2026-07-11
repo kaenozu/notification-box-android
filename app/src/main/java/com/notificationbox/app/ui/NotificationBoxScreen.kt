@@ -36,12 +36,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.notificationbox.app.BuildConfig
 import com.notificationbox.app.model.AppMode
@@ -57,7 +57,7 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
 
     val postNotificationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { _ ->
+    ) {
         vm.refreshPermissions()
     }
 
@@ -69,9 +69,7 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -91,16 +89,18 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         Text("状態: ${state.mode} / 通知アクセス: ${if (state.notificationAccessGranted) "許可済み" else "未許可"} / 通知送信: ${if (state.postNotificationsGranted) "許可済み" else "未許可"}")
                         Text("一時停止: ${state.pausedUntilText}")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                context.startActivity(openListenerSettings)
-                            }) { Text("通知アクセス") }
+                            Button(onClick = { context.startActivity(openListenerSettings) }) {
+                                Text("通知アクセス")
+                            }
                             Button(onClick = {
                                 if (Build.VERSION.SDK_INT >= 33 && !state.postNotificationsGranted) {
                                     postNotificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 } else {
                                     context.startActivity(openAppNotificationSettings)
                                 }
-                            }) { Text("通知許可") }
+                            }) {
+                                Text("通知許可")
+                            }
                             if (BuildConfig.DEBUG) {
                                 Button(onClick = vm::seed) { Text("デモ追加") }
                             }
@@ -111,9 +111,9 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = { vm.setMode(AppMode.Observation) }, label = { Text("観察") }, leadingIcon = { Icon(Icons.Filled.Notifications, null) })
-                    AssistChip(onClick = { vm.setMode(AppMode.Active) }, label = { Text("整理") }, leadingIcon = { Icon(Icons.Filled.Security, null) })
-                    AssistChip(onClick = { vm.pause("今日いっぱい") }, label = { Text("一時停止") }, leadingIcon = { Icon(Icons.Filled.Schedule, null) })
+                    AssistChip(onClick = { vm.setMode(AppMode.Observation) }, label = { Text("観察") }, leadingIcon = { Icon(Icons.Filled.Notifications, "観察モード") })
+                    AssistChip(onClick = { vm.setMode(AppMode.Active) }, label = { Text("整理") }, leadingIcon = { Icon(Icons.Filled.Security, "整理モード") })
+                    AssistChip(onClick = { vm.pause("今日いっぱい") }, label = { Text("一時停止") }, leadingIcon = { Icon(Icons.Filled.Schedule, "一時停止") })
                 }
             }
             item {
@@ -131,7 +131,10 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                     FilterChip(selected = state.selectedFilter == NotificationDecision.Ignore, onClick = { vm.setFilter(NotificationDecision.Ignore) }, label = { Text("無視") })
                 }
             }
-            items(state.items.filter { state.selectedFilter == null || it.category == state.selectedFilter }) { item ->
+            items(
+                items = state.items.filter { state.selectedFilter == null || it.category == state.selectedFilter },
+                key = { it.key }
+            ) { item ->
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
@@ -140,17 +143,24 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         ) {
                             Column(Modifier.fillMaxWidth(0.76f)) {
                                 Text(item.appLabel, style = MaterialTheme.typography.titleMedium)
-                                Text("${item.title ?: "(no title)"}")
+                                Text(item.title ?: "タイトルなし")
                             }
-                            IconButton(onClick = { vm.togglePinned(item.id, !item.userPinned) }) {
-                                Icon(Icons.Filled.Star, contentDescription = null)
+                            IconButton(onClick = { vm.togglePinned(item.key, !item.userPinned) }) {
+                                Icon(
+                                    Icons.Filled.Star,
+                                    contentDescription = if (item.userPinned) "ピン留めを解除" else "ピン留め"
+                                )
                             }
-                            IconButton(onClick = { vm.delete(item.id) }) {
-                                Icon(Icons.Filled.DeleteForever, contentDescription = null)
+                            IconButton(onClick = { vm.delete(item.key) }) {
+                                Icon(Icons.Filled.DeleteForever, contentDescription = "履歴から削除")
                             }
                         }
+                        item.text?.let { Text(it) }
                         Text(item.reason)
-                        Text("判定: ${item.category} / 固定: ${if (item.userPinned) "あり" else "なし"}")
+                        Text(
+                            "判定: ${item.category} / 固定: ${if (item.userPinned) "あり" else "なし"} / " +
+                                if (item.isActive) "端末に表示中" else "端末から消去済み"
+                        )
                     }
                 }
             }
