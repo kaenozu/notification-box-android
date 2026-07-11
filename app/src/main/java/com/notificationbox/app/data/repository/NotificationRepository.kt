@@ -25,6 +25,11 @@ interface NotificationRepository {
 
     suspend fun upsert(notification: NotificationRecord)
 
+    suspend fun synchronizeActive(
+        notifications: List<NotificationRecord>,
+        synchronizedAtMillis: Long
+    )
+
     suspend fun markRemoved(key: String, removedAtMillis: Long)
 
     suspend fun setPinned(key: String, pinned: Boolean)
