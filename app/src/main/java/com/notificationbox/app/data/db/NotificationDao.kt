@@ -46,7 +46,14 @@ interface NotificationDao {
     @Query("DELETE FROM notifications")
     suspend fun clearAll()
 
-    @Query("DELETE FROM notifications WHERE userPinned = 0 AND postTimeMillis < :cutoffMillis")
+    @Query(
+        """
+        DELETE FROM notifications
+        WHERE userPinned = 0
+          AND isActive = 0
+          AND postTimeMillis < :cutoffMillis
+        """
+    )
     suspend fun deleteExpired(cutoffMillis: Long): Int
 
     @Query(
@@ -56,7 +63,7 @@ interface NotificationDao {
             SELECT `key`
             FROM notifications
             WHERE userPinned = 0
-            ORDER BY postTimeMillis ASC, `key` ASC
+            ORDER BY isActive ASC, postTimeMillis ASC, `key` ASC
             LIMIT MAX((SELECT COUNT(*) FROM notifications) - :maxCount, 0)
         )
         """
