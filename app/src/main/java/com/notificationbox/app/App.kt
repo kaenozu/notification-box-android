@@ -16,7 +16,11 @@ class AppContainer(app: Application) {
 
     val permissionStatusProvider: PermissionStatusProvider = AndroidPermissionStatusProvider(platform)
     val notificationRepository: NotificationRepository =
-        RoomNotificationRepository(database.notificationDao())
+        RoomNotificationRepository(
+            notificationDao = database.notificationDao(),
+            appRuleDao = database.appRuleDao(),
+            classificationStatsDao = database.classificationStatsDao()
+        )
 }
 
 class App : Application() {
