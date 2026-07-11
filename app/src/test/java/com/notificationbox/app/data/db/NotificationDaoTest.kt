@@ -95,15 +95,17 @@ class NotificationDaoTest {
     }
 
     @Test
-    fun `expired unpinned notifications are deleted but pinned remain`() = runTest {
-        dao.upsert(entity(key = "expired", postTimeMillis = 10, userPinned = false))
-        dao.upsert(entity(key = "pinned", postTimeMillis = 10, userPinned = true))
-        dao.upsert(entity(key = "recent", postTimeMillis = 1_000, userPinned = false))
+    fun `expired inactive unpinned notifications are deleted but pinned and active remain`() = runTest {
+        dao.upsert(entity(key = "expired", postTimeMillis = 10, userPinned = false, isActive = false))
+        dao.upsert(entity(key = "pinned", postTimeMillis = 10, userPinned = true, isActive = false))
+        dao.upsert(entity(key = "active", postTimeMillis = 10, userPinned = false, isActive = true))
+        dao.upsert(entity(key = "recent", postTimeMillis = 1_000, userPinned = false, isActive = false))
 
         dao.deleteExpired(cutoffMillis = 100)
 
         assertNull(dao.getByKey("expired"))
         assertTrue(dao.getByKey("pinned") != null)
+        assertTrue(dao.getByKey("active") != null)
         assertTrue(dao.getByKey("recent") != null)
     }
 
@@ -121,11 +123,26 @@ class NotificationDaoTest {
         assertTrue(dao.getByKey("key-501") != null)
     }
 
+    @Test
+    fun `maximum count prefers deleting inactive rows`() = runTest {
+        repeat(499) { index ->
+            dao.upsert(entity(key = "active-$index", postTimeMillis = index.toLong(), isActive = true))
+        }
+        dao.upsert(entity(key = "inactive", postTimeMillis = 10_000, isActive = false))
+        dao.upsert(entity(key = "old-active", postTimeMillis = -1, isActive = true))
+
+        dao.pruneToMaximum(500)
+
+        assertNull(dao.getByKey("inactive"))
+        assertTrue(dao.getByKey("old-active") != null)
+    }
+
     private fun entity(
         key: String,
         title: String? = "title",
         postTimeMillis: Long = 1_000,
-        userPinned: Boolean = false
+        userPinned: Boolean = false,
+        isActive: Boolean = true
     ): NotificationEntity =
         NotificationEntity(
             key = key,
@@ -140,7 +157,7 @@ class NotificationDaoTest {
             category = "HoldForDigest",
             reason = "test",
             userPinned = userPinned,
-            isActive = true,
-            removedAtMillis = null
+            isActive = isActive,
+            removedAtMillis = if (isActive) null else postTimeMillis
         )
 }
