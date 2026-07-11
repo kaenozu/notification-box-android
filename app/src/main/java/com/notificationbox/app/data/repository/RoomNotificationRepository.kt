@@ -196,7 +196,7 @@ class RoomNotificationRepository(
             DecisionSource.UserOverride ->
                 "ユーザーがこの通知を「${finalDecision.displayName()}」に変更"
             DecisionSource.AppRule ->
-                "$appLabelを「${finalDecision.displayName()}」に設定済み"
+                "${appLabel}を「${finalDecision.displayName()}」に設定済み"
             DecisionSource.Automatic -> reason
         }
 
