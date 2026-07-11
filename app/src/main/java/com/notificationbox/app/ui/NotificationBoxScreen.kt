@@ -154,6 +154,22 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                     }
                 }
             }
+            if (state.items.isEmpty()) {
+                item {
+                    Card {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("通知がありません", style = MaterialTheme.typography.titleMedium)
+                            Text("通知アクセスを許可すると、ここに履歴が表示されます")
+                        }
+                    }
+                }
+            }
             item {
                 Spacer(Modifier.height(8.dp))
                 Text("ダイジェスト時刻: ${state.digestSchedule.hours.joinToString { String.format("%02d:00", it) }}")
