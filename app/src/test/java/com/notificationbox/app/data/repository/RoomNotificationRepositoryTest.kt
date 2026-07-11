@@ -58,17 +58,23 @@ class RoomNotificationRepositoryTest {
     }
 
     @Test
-    fun `upsert prunes expired unpinned rows but keeps pinned rows`() = runTest {
+    fun `upsert prunes expired inactive unpinned rows but keeps pinned and active rows`() = runTest {
         val expiredTime = nowMillis - RoomNotificationRepository.RETENTION.toMillis() - 1
-        database.notificationDao().upsert(entity(key = "expired", postTimeMillis = expiredTime))
         database.notificationDao().upsert(
-            entity(key = "pinned", postTimeMillis = expiredTime, userPinned = true)
+            entity(key = "expired", postTimeMillis = expiredTime, isActive = false)
+        )
+        database.notificationDao().upsert(
+            entity(key = "pinned", postTimeMillis = expiredTime, userPinned = true, isActive = false)
+        )
+        database.notificationDao().upsert(
+            entity(key = "active", postTimeMillis = expiredTime, isActive = true)
         )
 
         repository.upsert(record(key = "new"))
 
         assertNull(database.notificationDao().getByKey("expired"))
         assertTrue(database.notificationDao().getByKey("pinned") != null)
+        assertTrue(database.notificationDao().getByKey("active") != null)
         assertTrue(database.notificationDao().getByKey("new") != null)
     }
 
@@ -148,7 +154,8 @@ class RoomNotificationRepositoryTest {
         key: String,
         postTimeMillis: Long = nowMillis,
         userPinned: Boolean = false,
-        category: String = NotificationDecision.HoldForDigest.name
+        category: String = NotificationDecision.HoldForDigest.name,
+        isActive: Boolean = true
     ): NotificationEntity =
         NotificationEntity(
             key = key,
@@ -163,7 +170,7 @@ class RoomNotificationRepositoryTest {
             category = category,
             reason = "test",
             userPinned = userPinned,
-            isActive = true,
-            removedAtMillis = null
+            isActive = isActive,
+            removedAtMillis = if (isActive) null else postTimeMillis
         )
 }
