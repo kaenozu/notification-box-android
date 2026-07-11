@@ -14,7 +14,7 @@ enum class AppMode {
 }
 
 data class NotificationItem(
-    val id: Long,
+    val key: String,
     val packageName: String,
     val appLabel: String,
     val title: String?,
@@ -22,7 +22,9 @@ data class NotificationItem(
     val postTime: Instant,
     val category: NotificationDecision,
     val reason: String,
-    val userPinned: Boolean = false
+    val userPinned: Boolean = false,
+    val isActive: Boolean = true,
+    val removedAt: Instant? = null
 )
 
 data class DigestSchedule(
