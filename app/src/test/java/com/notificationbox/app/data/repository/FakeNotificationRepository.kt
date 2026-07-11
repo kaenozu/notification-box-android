@@ -16,21 +16,28 @@ class FakeNotificationRepository : NotificationRepository {
     override fun observeNotifications(): Flow<List<NotificationItem>> = items
 
     override suspend fun upsert(notification: NotificationRecord) {
-        val existing = items.value.firstOrNull { it.key == notification.key }
-        val mapped = NotificationItem(
-            key = notification.key,
-            packageName = notification.packageName,
-            appLabel = notification.appLabel,
-            title = notification.title,
-            text = notification.text,
-            postTime = Instant.ofEpochMilli(notification.postTimeMillis),
-            category = notification.category,
-            reason = notification.reason,
-            userPinned = existing?.userPinned ?: false,
-            isActive = notification.isActive,
-            removedAt = notification.removedAtMillis?.let(Instant::ofEpochMilli)
-        )
-        items.value = listOf(mapped) + items.value.filterNot { it.key == mapped.key }
+        items.value = upsertInto(items.value, notification)
+    }
+
+    override suspend fun synchronizeActive(
+        notifications: List<NotificationRecord>,
+        synchronizedAtMillis: Long
+    ) {
+        val activeKeys = notifications.mapTo(mutableSetOf(), NotificationRecord::key)
+        var synchronizedItems = items.value.map { item ->
+            if (item.isActive && item.key !in activeKeys) {
+                item.copy(
+                    isActive = false,
+                    removedAt = Instant.ofEpochMilli(synchronizedAtMillis)
+                )
+            } else {
+                item
+            }
+        }
+        notifications.forEach { notification ->
+            synchronizedItems = upsertInto(synchronizedItems, notification)
+        }
+        items.value = synchronizedItems
     }
 
     override suspend fun markRemoved(key: String, removedAtMillis: Long) {
@@ -56,5 +63,26 @@ class FakeNotificationRepository : NotificationRepository {
 
     fun emit(newItems: List<NotificationItem>) {
         items.value = newItems
+    }
+
+    private fun upsertInto(
+        currentItems: List<NotificationItem>,
+        notification: NotificationRecord
+    ): List<NotificationItem> {
+        val existing = currentItems.firstOrNull { it.key == notification.key }
+        val mapped = NotificationItem(
+            key = notification.key,
+            packageName = notification.packageName,
+            appLabel = notification.appLabel,
+            title = notification.title,
+            text = notification.text,
+            postTime = Instant.ofEpochMilli(notification.postTimeMillis),
+            category = notification.category,
+            reason = notification.reason,
+            userPinned = existing?.userPinned ?: false,
+            isActive = notification.isActive,
+            removedAt = notification.removedAtMillis?.let(Instant::ofEpochMilli)
+        )
+        return listOf(mapped) + currentItems.filterNot { it.key == mapped.key }
     }
 }
