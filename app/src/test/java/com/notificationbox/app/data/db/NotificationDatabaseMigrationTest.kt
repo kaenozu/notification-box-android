@@ -3,6 +3,7 @@ package com.notificationbox.app.data.db
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -109,10 +110,7 @@ class NotificationDatabaseMigrationTest {
             migrated.classificationStatsDao().increment("automatic.total")
             assertEquals(
                 1L,
-                migrated.classificationStatsDao().observeAll()
-                    .let { flow -> kotlinx.coroutines.flow.first(flow) }
-                    .single()
-                    .count
+                migrated.classificationStatsDao().observeAll().first().single().count
             )
         } finally {
             migrated.close()
