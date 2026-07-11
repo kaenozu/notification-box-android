@@ -1,0 +1,134 @@
+package com.notificationbox.app.ui
+
+import android.os.Build
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.notificationbox.app.model.AppMode
+import com.notificationbox.app.model.NotificationDecision
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
+    val context = LocalContext.current
+    val state by vm.state.collectAsState()
+    val openListenerSettings = remember(context) { notificationListenerSettingsIntent(context) }
+    val openAppNotificationSettings = remember(context) { appNotificationSettingsIntent(context) }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("通知箱") }) }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("観察から始めて、必要なものだけ即時通過します", style = MaterialTheme.typography.titleMedium)
+                        Text("状態: ${state.mode} / 通知アクセス: ${if (state.notificationAccessGranted) "許可済み" else "未許可"} / 通知送信: ${if (state.postNotificationsGranted) "許可済み" else "未許可"}")
+                        Text("一時停止: ${state.pausedUntilText}")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                vm.enableNotificationAccess()
+                                context.startActivity(openListenerSettings)
+                            }) { Text("通知アクセス") }
+                            Button(onClick = {
+                                vm.enablePostNotifications()
+                                if (Build.VERSION.SDK_INT >= 33) {
+                                    context.startActivity(openAppNotificationSettings)
+                                }
+                            }) { Text("通知許可") }
+                            Button(onClick = vm::seed) { Text("デモ追加") }
+                            Button(onClick = vm::clearAll) { Text("全消去") }
+                        }
+                    }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(onClick = { vm.setMode(AppMode.Observation) }, label = { Text("観察") }, leadingIcon = { Icon(Icons.Filled.Notifications, null) })
+                    AssistChip(onClick = { vm.setMode(AppMode.Active) }, label = { Text("整理") }, leadingIcon = { Icon(Icons.Filled.Security, null) })
+                    AssistChip(onClick = { vm.pause("今日いっぱい") }, label = { Text("一時停止") }, leadingIcon = { Icon(Icons.Filled.Schedule, null) })
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(onClick = { vm.setDigestHours(listOf(8, 12, 18, 21)) }, label = { Text("4回") })
+                    AssistChip(onClick = { vm.setDigestHours(listOf(9, 18)) }, label = { Text("2回") })
+                    AssistChip(onClick = { vm.setDigestHours(listOf(20)) }, label = { Text("1回") })
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = state.selectedFilter == null, onClick = { vm.setFilter(null) }, label = { Text("すべて") })
+                    FilterChip(selected = state.selectedFilter == NotificationDecision.KeepNow, onClick = { vm.setFilter(NotificationDecision.KeepNow) }, label = { Text("即時") })
+                    FilterChip(selected = state.selectedFilter == NotificationDecision.HoldForDigest, onClick = { vm.setFilter(NotificationDecision.HoldForDigest) }, label = { Text("ダイジェスト") })
+                    FilterChip(selected = state.selectedFilter == NotificationDecision.Ignore, onClick = { vm.setFilter(NotificationDecision.Ignore) }, label = { Text("無視") })
+                }
+            }
+            items(state.items.filter { state.selectedFilter == null || it.category == state.selectedFilter }) { item ->
+                Card {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(Modifier.fillMaxWidth(0.76f)) {
+                                Text(item.appLabel, style = MaterialTheme.typography.titleMedium)
+                                Text("${item.title ?: "(no title)"}")
+                            }
+                            IconButton(onClick = { vm.togglePinned(item.id, !item.userPinned) }) {
+                                Icon(Icons.Filled.Star, contentDescription = null)
+                            }
+                            IconButton(onClick = { vm.delete(item.id) }) {
+                                Icon(Icons.Filled.DeleteForever, contentDescription = null)
+                            }
+                        }
+                        Text(item.reason)
+                        Text("判定: ${item.category} / 固定: ${if (item.userPinned) "あり" else "なし"}")
+                    }
+                }
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
+                Text("ダイジェスト時刻: ${state.digestSchedule.hours.joinToString { String.format("%02d:00", it) }}")
+            }
+        }
+    }
+}
