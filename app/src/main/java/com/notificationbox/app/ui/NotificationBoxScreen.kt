@@ -390,7 +390,7 @@ private fun AppRuleCard(
                 Column {
                     Text(rule.appLabel, style = MaterialTheme.typography.titleMedium)
                     Text(rule.packageName, style = MaterialTheme.typography.bodySmall)
-                    Text("設定変更: ${changeCount}回", style = MaterialTheme.typography.bodySmall)
+                    Text("補正・設定: ${changeCount}回", style = MaterialTheme.typography.bodySmall)
                 }
             }
             FlowRow(
@@ -494,7 +494,7 @@ private fun AppIcon(packageName: String, appLabel: String) {
     if (bitmap != null) {
         Image(
             bitmap = bitmap,
-            contentDescription = "$appLabelのアイコン",
+            contentDescription = "${appLabel}のアイコン",
             modifier = Modifier
                 .size(40.dp)
                 .padding(end = 8.dp)
@@ -502,7 +502,7 @@ private fun AppIcon(packageName: String, appLabel: String) {
     } else {
         Icon(
             imageVector = Icons.Filled.Notifications,
-            contentDescription = "$appLabelのアイコン",
+            contentDescription = "${appLabel}のアイコン",
             modifier = Modifier
                 .size(40.dp)
                 .padding(end = 8.dp)
