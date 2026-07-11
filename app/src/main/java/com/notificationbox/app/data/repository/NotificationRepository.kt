@@ -1,5 +1,7 @@
 package com.notificationbox.app.data.repository
 
+import com.notificationbox.app.model.AppRule
+import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +25,10 @@ data class NotificationRecord(
 interface NotificationRepository {
     fun observeNotifications(): Flow<List<NotificationItem>>
 
+    fun observeAppRules(): Flow<List<AppRule>>
+
+    fun observeClassificationStats(): Flow<ClassificationStats>
+
     suspend fun upsert(notification: NotificationRecord)
 
     suspend fun synchronizeActive(
@@ -34,6 +40,14 @@ interface NotificationRepository {
     suspend fun markRemoved(key: String, removedAtMillis: Long)
 
     suspend fun setPinned(key: String, pinned: Boolean)
+
+    suspend fun setNotificationDecision(key: String, decision: NotificationDecision?)
+
+    suspend fun setAppRule(
+        packageName: String,
+        appLabel: String,
+        decision: NotificationDecision?
+    )
 
     suspend fun delete(key: String)
 
