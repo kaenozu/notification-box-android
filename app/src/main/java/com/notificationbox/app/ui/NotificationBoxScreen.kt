@@ -142,10 +142,10 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                                 Text(item.appLabel, style = MaterialTheme.typography.titleMedium)
                                 Text("${item.title ?: "(no title)"}")
                             }
-                            IconButton(onClick = { vm.togglePinned(item.id, !item.userPinned) }) {
+                            IconButton(onClick = { vm.togglePinned(item.notificationKey, !item.userPinned) }) {
                                 Icon(Icons.Filled.Star, contentDescription = null)
                             }
-                            IconButton(onClick = { vm.delete(item.id) }) {
+                            IconButton(onClick = { vm.delete(item.notificationKey) }) {
                                 Icon(Icons.Filled.DeleteForever, contentDescription = null)
                             }
                         }

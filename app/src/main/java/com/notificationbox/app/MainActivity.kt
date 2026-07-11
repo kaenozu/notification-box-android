@@ -10,7 +10,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as App).container
-        val factory = NotificationBoxViewModelFactory(container.permissionStatusProvider)
+        val factory = NotificationBoxViewModelFactory(
+            container.permissionStatusProvider,
+            container.notificationRepository
+        )
         setContent {
             NotificationBoxApp(factory)
         }

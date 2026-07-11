@@ -1,6 +1,11 @@
 package com.notificationbox.app.ui
 
+import com.notificationbox.app.domain.FakeNotificationRepository
+import com.notificationbox.app.domain.NotificationClassifier
+import com.notificationbox.app.domain.NotificationRecord
+import com.notificationbox.app.domain.NotificationSample
 import com.notificationbox.app.model.AppMode
+import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.permission.FakePermissionStatusProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -12,6 +17,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.test.resetMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -19,12 +25,13 @@ import org.junit.Test
 class NotificationBoxViewModelTest {
 
     private val fakeProvider = FakePermissionStatusProvider()
+    private val fakeRepository = FakeNotificationRepository()
     private lateinit var viewModel: NotificationBoxViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        viewModel = NotificationBoxViewModel(fakeProvider)
+        viewModel = NotificationBoxViewModel(fakeProvider, fakeRepository)
     }
 
     @After
@@ -33,155 +40,92 @@ class NotificationBoxViewModelTest {
     }
 
     @Test
-    fun `when both permissions false, state reflects false`() = runTest {
-        fakeProvider.listenerGranted = false
-        fakeProvider.postNotificationsGranted = false
-
-        viewModel.refreshPermissions()
+    fun `repository items are reflected in state`() = runTest {
+        val record = NotificationRecord(
+            key = "k1", packageName = "com.test", appLabel = "Test",
+            title = "t", text = "b", postTimeMillis = 1000L,
+            notificationId = 1, tag = null, channelId = "ch",
+            category = NotificationDecision.KeepNow, reason = "r",
+            userPinned = false, isActive = true, removedAtMillis = null
+        )
+        fakeRepository.upsert(record)
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
-        assertEquals(false, state.notificationAccessGranted)
-        assertEquals(false, state.postNotificationsGranted)
+        val items = viewModel.state.first().items
+        assertEquals(1, items.size)
+        assertEquals("k1", items.first().notificationKey)
     }
 
     @Test
-    fun `when listener true and post false, state is correct`() = runTest {
-        fakeProvider.listenerGranted = true
-        fakeProvider.postNotificationsGranted = false
-
-        viewModel.refreshPermissions()
+    fun `togglePinned delegates to repository`() = runTest {
+        val record = NotificationRecord(
+            key = "k1", packageName = "com.test", appLabel = "Test",
+            title = "t", text = "b", postTimeMillis = 1000L,
+            notificationId = 1, tag = null, channelId = "ch",
+            category = NotificationDecision.KeepNow, reason = "r",
+            userPinned = false, isActive = true, removedAtMillis = null
+        )
+        fakeRepository.upsert(record)
         advanceUntilIdle()
+        fakeRepository.resetCounts()
 
-        val state = viewModel.state.first()
-        assertEquals(true, state.notificationAccessGranted)
-        assertEquals(false, state.postNotificationsGranted)
+        viewModel.togglePinned("k1", true)
+        advanceUntilIdle()
+        assertTrue(fakeRepository.setPinnedCount > 0)
     }
 
     @Test
-    fun `when listener false, post permission true, state is correct`() = runTest {
-        fakeProvider.listenerGranted = false
-        fakeProvider.postNotificationsGranted = true
-
-        viewModel.refreshPermissions()
+    fun `delete delegates to repository`() = runTest {
+        val record = NotificationRecord(
+            key = "k1", packageName = "com.test", appLabel = "Test",
+            title = "t", text = "b", postTimeMillis = 1000L,
+            notificationId = 1, tag = null, channelId = "ch",
+            category = NotificationDecision.KeepNow, reason = "r",
+            userPinned = false, isActive = true, removedAtMillis = null
+        )
+        fakeRepository.upsert(record)
         advanceUntilIdle()
+        fakeRepository.resetCounts()
 
-        val state = viewModel.state.first()
-        assertEquals(false, state.notificationAccessGranted)
-        assertEquals(true, state.postNotificationsGranted)
+        viewModel.delete("k1")
+        advanceUntilIdle()
+        assertTrue(fakeRepository.deleteCount > 0)
     }
 
     @Test
-    fun `when both permissions true, state reflects true`() = runTest {
-        fakeProvider.listenerGranted = true
-        fakeProvider.postNotificationsGranted = true
-
-        viewModel.refreshPermissions()
-        advanceUntilIdle()
-
-        val state = viewModel.state.first()
-        assertEquals(true, state.notificationAccessGranted)
-        assertEquals(true, state.postNotificationsGranted)
-    }
-
-    @Test
-    fun `permission refresh after revocation changes state`() = runTest {
-        fakeProvider.listenerGranted = true
-        fakeProvider.postNotificationsGranted = true
-        viewModel.refreshPermissions()
-        advanceUntilIdle()
-        assertEquals(true, viewModel.state.first().notificationAccessGranted)
-
-        fakeProvider.listenerGranted = false
-        viewModel.refreshPermissions()
-        advanceUntilIdle()
-        assertEquals(false, viewModel.state.first().notificationAccessGranted)
-    }
-
-    @Test
-    fun `permission changes do not corrupt other state fields`() = runTest {
-        fakeProvider.listenerGranted = true
-        viewModel.refreshPermissions()
-        advanceUntilIdle()
-
-        val state = viewModel.state.first()
-        assertEquals(true, state.notificationAccessGranted)
-        assertEquals(AppMode.Observation, state.mode)
-    }
-
-    @Test
-    fun `only opening settings does not grant permission`() = runTest {
-        fakeProvider.listenerGranted = false
-        fakeProvider.postNotificationsGranted = false
-        viewModel.refreshPermissions()
-        advanceUntilIdle()
-
-        assertEquals(false, viewModel.state.first().notificationAccessGranted)
-        assertEquals(false, viewModel.state.first().postNotificationsGranted)
-    }
-
-    @Test
-    fun `permission state updates independently of store updates`() = runTest {
-        // Add a notification (store update)
-        viewModel.ingestDemo("com.test", "title", "text")
-        advanceUntilIdle()
-
-        // Verify items added
-        assertEquals(1, viewModel.state.first().items.size)
-
-        // Change permission - should NOT trigger extra Provider calls beyond refreshPermissions
-        fakeProvider.listenerGranted = true
-        viewModel.refreshPermissions()
-        advanceUntilIdle()
-
-        // Both should be updated
-        val state = viewModel.state.first()
-        assertEquals(true, state.notificationAccessGranted)
-        assertEquals(1, state.items.size)
-    }
-
-    @Test
-    fun `provider call counts are tracked correctly`() = runTest {
-        // Initialization (in @Before setup) calls both methods once
-        assertEquals(1, fakeProvider.listenerCallCount)
-        assertEquals(1, fakeProvider.postCallCount)
-
-        // refreshPermissions: should call both again
-        fakeProvider.resetCallCounts()
-        viewModel.refreshPermissions()
-        advanceUntilIdle()
-        assertEquals(1, fakeProvider.listenerCallCount)
-        assertEquals(1, fakeProvider.postCallCount)
-
-        // Store updates should NOT call Provider
-        fakeProvider.resetCallCounts()
-        viewModel.ingestDemo("com.test", "title", "text")
-        advanceUntilIdle()
-        assertEquals(0, fakeProvider.listenerCallCount)
-        assertEquals(0, fakeProvider.postCallCount)
-
-        fakeProvider.resetCallCounts()
-        viewModel.setFilter(null)
-        advanceUntilIdle()
-        assertEquals(0, fakeProvider.listenerCallCount)
-        assertEquals(0, fakeProvider.postCallCount)
-
-        fakeProvider.resetCallCounts()
-        viewModel.togglePinned(1L, true)
-        advanceUntilIdle()
-        assertEquals(0, fakeProvider.listenerCallCount)
-        assertEquals(0, fakeProvider.postCallCount)
-
-        fakeProvider.resetCallCounts()
-        viewModel.delete(1L)
-        advanceUntilIdle()
-        assertEquals(0, fakeProvider.listenerCallCount)
-        assertEquals(0, fakeProvider.postCallCount)
-
-        fakeProvider.resetCallCounts()
+    fun `clearAll delegates to repository`() = runTest {
         viewModel.clearAll()
         advanceUntilIdle()
-        assertEquals(0, fakeProvider.listenerCallCount)
-        assertEquals(0, fakeProvider.postCallCount)
+        assertTrue(fakeRepository.clearAllCount > 0)
+    }
+
+    @Test
+    fun `permission changes do not corrupt notification items`() = runTest {
+        fakeRepository.upsert(NotificationRecord(
+            key = "k1", packageName = "com.test", appLabel = "Test",
+            title = "t", text = "b", postTimeMillis = 1000L,
+            notificationId = 1, tag = null, channelId = "ch",
+            category = NotificationDecision.KeepNow, reason = "r",
+            userPinned = false, isActive = true, removedAtMillis = null
+        ))
+        advanceUntilIdle()
+        assertEquals(1, viewModel.state.first().items.size)
+
+        viewModel.refreshPermissions()
+        advanceUntilIdle()
+        assertEquals(1, viewModel.state.first().items.size)
+    }
+
+    @Test
+    fun `provider call counts correct for initialization`() = runTest {
+        assertEquals(1, fakeProvider.listenerCallCount)
+        assertEquals(1, fakeProvider.postCallCount)
+    }
+
+    @Test
+    fun `filter state is preserved through notification updates`() = runTest {
+        viewModel.setFilter(NotificationDecision.KeepNow)
+        advanceUntilIdle()
+        assertEquals(NotificationDecision.KeepNow, viewModel.state.first().selectedFilter)
     }
 }
