@@ -16,7 +16,7 @@ class RoomNotificationRepository(
 ) : NotificationRepository {
 
     override fun observeNotifications(): Flow<List<NotificationItem>> =
-        dao.observeAll().map { entities -> entities.map(NotificationEntity::toModel) }
+        dao.observeAll().map { entities -> entities.map { it.toModel() } }
 
     override suspend fun upsert(notification: NotificationRecord) {
         val existing = dao.getByKey(notification.key)
