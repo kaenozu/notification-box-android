@@ -22,6 +22,9 @@ interface NotificationDao {
     @Upsert
     suspend fun upsert(entity: NotificationEntity)
 
+    @Query("UPDATE notifications SET userDecision = :decision WHERE `key` = :key")
+    suspend fun setUserDecision(key: String, decision: String?): Int
+
     @Query("UPDATE notifications SET userPinned = :pinned WHERE `key` = :key")
     suspend fun setPinned(key: String, pinned: Boolean): Int
 
