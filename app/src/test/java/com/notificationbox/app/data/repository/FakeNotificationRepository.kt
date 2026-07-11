@@ -20,10 +20,10 @@ class FakeNotificationRepository : NotificationRepository {
     }
 
     override suspend fun synchronizeActive(
+        activeKeys: Set<String>,
         notifications: List<NotificationRecord>,
         synchronizedAtMillis: Long
     ) {
-        val activeKeys = notifications.mapTo(mutableSetOf(), NotificationRecord::key)
         var synchronizedItems = items.value.map { item ->
             if (item.isActive && item.key !in activeKeys) {
                 item.copy(
