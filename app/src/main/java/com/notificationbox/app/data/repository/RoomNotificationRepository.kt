@@ -9,38 +9,71 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class RoomNotificationRepository(
     private val dao: NotificationDao,
     private val clock: Clock = Clock.systemUTC()
 ) : NotificationRepository {
+    private val mutationMutex = Mutex()
 
     override fun observeNotifications(): Flow<List<NotificationItem>> =
         dao.observeAll().map { entities -> entities.map { it.toModel() } }
 
     override suspend fun upsert(notification: NotificationRecord) {
-        val existing = dao.getByKey(notification.key)
-        dao.upsert(notification.toEntity(userPinned = existing?.userPinned ?: false))
-        prune()
+        mutationMutex.withLock {
+            upsertLocked(notification)
+            pruneLocked()
+        }
+    }
+
+    override suspend fun synchronizeActive(
+        notifications: List<NotificationRecord>,
+        synchronizedAtMillis: Long
+    ) {
+        mutationMutex.withLock {
+            val activeKeys = notifications.map(NotificationRecord::key)
+            if (activeKeys.isEmpty()) {
+                dao.markAllActiveRemoved(synchronizedAtMillis)
+            } else {
+                dao.markActiveMissing(activeKeys, synchronizedAtMillis)
+            }
+            notifications.forEach { upsertLocked(it) }
+            pruneLocked()
+        }
     }
 
     override suspend fun markRemoved(key: String, removedAtMillis: Long) {
-        dao.markRemoved(key, removedAtMillis)
+        mutationMutex.withLock {
+            dao.markRemoved(key, removedAtMillis)
+        }
     }
 
     override suspend fun setPinned(key: String, pinned: Boolean) {
-        dao.setPinned(key, pinned)
+        mutationMutex.withLock {
+            dao.setPinned(key, pinned)
+        }
     }
 
     override suspend fun delete(key: String) {
-        dao.deleteByKey(key)
+        mutationMutex.withLock {
+            dao.deleteByKey(key)
+        }
     }
 
     override suspend fun clearAll() {
-        dao.clearAll()
+        mutationMutex.withLock {
+            dao.clearAll()
+        }
     }
 
-    private suspend fun prune() {
+    private suspend fun upsertLocked(notification: NotificationRecord) {
+        val existing = dao.getByKey(notification.key)
+        dao.upsert(notification.toEntity(userPinned = existing?.userPinned ?: false))
+    }
+
+    private suspend fun pruneLocked() {
         val cutoff = clock.millis() - RETENTION.toMillis()
         dao.deleteExpired(cutoff)
         dao.pruneToMaximum(MAX_NOTIFICATION_COUNT)
