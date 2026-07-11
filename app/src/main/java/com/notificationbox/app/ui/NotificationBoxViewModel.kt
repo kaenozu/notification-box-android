@@ -42,7 +42,7 @@ class NotificationBoxViewModel(
             postNotificationsGranted = permissions.postNotificationsGranted,
             items = notifications
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppState())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AppState())
 
     fun refreshPermissions() {
         permissionState.value = readPermissionState()
