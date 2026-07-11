@@ -29,15 +29,15 @@ class RoomNotificationRepository(
     }
 
     override suspend fun synchronizeActive(
+        activeKeys: Set<String>,
         notifications: List<NotificationRecord>,
         synchronizedAtMillis: Long
     ) {
         mutationMutex.withLock {
-            val activeKeys = notifications.map(NotificationRecord::key)
             if (activeKeys.isEmpty()) {
                 dao.markAllActiveRemoved(synchronizedAtMillis)
             } else {
-                dao.markActiveMissing(activeKeys, synchronizedAtMillis)
+                dao.markActiveMissing(activeKeys.toList(), synchronizedAtMillis)
             }
             notifications.forEach { upsertLocked(it) }
             pruneLocked()
