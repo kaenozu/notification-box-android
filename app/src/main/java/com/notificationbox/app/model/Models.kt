@@ -8,6 +8,12 @@ enum class NotificationDecision {
     Ignore
 }
 
+enum class DecisionSource {
+    Automatic,
+    AppRule,
+    UserOverride
+}
+
 enum class AppMode {
     Observation,
     Active
@@ -20,11 +26,32 @@ data class NotificationItem(
     val title: String?,
     val text: String?,
     val postTime: Instant,
+    val automaticDecision: NotificationDecision,
+    val userDecision: NotificationDecision?,
+    val appRuleDecision: NotificationDecision?,
     val category: NotificationDecision,
+    val decisionSource: DecisionSource,
+    val automaticReason: String,
     val reason: String,
     val userPinned: Boolean = false,
     val isActive: Boolean = true,
     val removedAt: Instant? = null
+)
+
+data class AppRule(
+    val packageName: String,
+    val appLabel: String,
+    val decision: NotificationDecision,
+    val updatedAt: Instant
+)
+
+data class ClassificationStats(
+    val automaticallyClassified: Long = 0,
+    val userOverrideChanges: Long = 0,
+    val appRuleChanges: Long = 0,
+    val automaticByDecision: Map<NotificationDecision, Long> = emptyMap(),
+    val selectedByDecision: Map<NotificationDecision, Long> = emptyMap(),
+    val appChangeCounts: Map<String, Long> = emptyMap()
 )
 
 data class DigestSchedule(
@@ -38,5 +65,7 @@ data class AppState(
     val digestSchedule: DigestSchedule = DigestSchedule(),
     val pausedUntilText: String = "解除まで",
     val items: List<NotificationItem> = emptyList(),
+    val appRules: List<AppRule> = emptyList(),
+    val classificationStats: ClassificationStats = ClassificationStats(),
     val selectedFilter: NotificationDecision? = null
 )
