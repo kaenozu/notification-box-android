@@ -30,9 +30,13 @@ class NotificationRelayService : NotificationListenerService() {
         super.onListenerConnected()
         val currentNotifications = runCatching {
             activeNotifications?.toList().orEmpty()
-        }.getOrElse { emptyList() }
+        }.getOrNull() ?: return
 
-        currentNotifications.forEach(::persistPosted)
+        val records = currentNotifications.mapNotNull(recordFactory::create)
+        val synchronizedAtMillis = clock.millis()
+        serviceScope.launch {
+            repository.synchronizeActive(records, synchronizedAtMillis)
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
