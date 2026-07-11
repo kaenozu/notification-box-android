@@ -32,13 +32,50 @@ jobs:
         run: chmod +x gradlew
 
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --no-daemon
+        id: unit_tests
+        run: |
+          set +e
+          ./gradlew testDebugUnitTest --no-daemon > unit-tests.log 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Lint
-        run: ./gradlew lintDebug --no-daemon
+        id: lint
+        run: |
+          set +e
+          ./gradlew lintDebug --no-daemon > lint.log 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Assemble debug
-        run: ./gradlew assembleDebug --no-daemon
+        id: assemble
+        run: |
+          set +e
+          ./gradlew assembleDebug --no-daemon > assemble.log 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Verify Room schema is committed
+        id: schema
+        run: |
+          set +e
+          git diff --exit-code -- app/schemas > schema-diff.log 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ci-diagnostics
+          path: |
+            unit-tests.log
+            lint.log
+            assemble.log
+            schema-diff.log
+            app/build/reports/tests/testDebugUnitTest
+            app/build/test-results/testDebugUnitTest
+          if-no-files-found: warn
 
       - name: Upload Room schema
         if: always()
@@ -46,4 +83,26 @@ jobs:
         with:
           name: room-schema
           path: app/schemas
-          if-no-files-found: warn
+          if-no-files-found: error
+
+      - name: Verify outcomes
+        if: always()
+        env:
+          UNIT_EXIT: ${{ steps.unit_tests.outputs.exit_code }}
+          LINT_EXIT: ${{ steps.lint.outputs.exit_code }}
+          ASSEMBLE_EXIT: ${{ steps.assemble.outputs.exit_code }}
+          SCHEMA_EXIT: ${{ steps.schema.outputs.exit_code }}
+        run: |
+          failed=0
+          for result in "$UNIT_EXIT" "$LINT_EXIT" "$ASSEMBLE_EXIT" "$SCHEMA_EXIT"; do
+            if [ "$result" != "0" ]; then
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "Unit tests exit: $UNIT_EXIT"
+            echo "Lint exit: $LINT_EXIT"
+            echo "Assemble exit: $ASSEMBLE_EXIT"
+            echo "Schema exit: $SCHEMA_EXIT"
+            exit 1
+          fi
