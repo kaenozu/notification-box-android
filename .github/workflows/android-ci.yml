@@ -69,10 +69,20 @@ jobs:
         id: schema
         run: |
           set +e
-          git diff --exit-code -- app/schemas > schema-diff.log 2>&1
-          exit_code=$?
+          : > schema-diff.log
+          git diff --exit-code -- app/schemas >> schema-diff.log 2>&1
+          tracked_exit=$?
+          schema_status="$(git status --porcelain --untracked-files=all -- app/schemas)"
+          if [ -n "$schema_status" ]; then
+            echo "$schema_status" >> schema-diff.log
+          fi
+          if [ "$tracked_exit" -ne 0 ] || [ -n "$schema_status" ]; then
+            exit_code=1
+            cat schema-diff.log
+          else
+            exit_code=0
+          fi
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          if [ "$exit_code" -ne 0 ]; then cat schema-diff.log; fi
           exit 0
 
       - name: Upload diagnostics
