@@ -19,6 +19,29 @@ class NotificationMappingTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
+    fun `regular title has priority over big title`() {
+        val notification = Notification().apply {
+            extras.putCharSequence(Notification.EXTRA_TITLE, "regular title")
+            extras.putCharSequence(Notification.EXTRA_TITLE_BIG, "big title")
+        }
+
+        val extracted = NotificationTextExtractor.extract(notification)
+
+        assertEquals("regular title", extracted.title)
+    }
+
+    @Test
+    fun `big title is used when regular title is absent`() {
+        val notification = Notification().apply {
+            extras.putCharSequence(Notification.EXTRA_TITLE_BIG, "big title")
+        }
+
+        val extracted = NotificationTextExtractor.extract(notification)
+
+        assertEquals("big title", extracted.title)
+    }
+
+    @Test
     fun `big text has priority over regular text`() {
         val notification = Notification.Builder(context, "channel")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -31,6 +54,17 @@ class NotificationMappingTest {
 
         assertEquals("title", extracted.title)
         assertEquals("expanded", extracted.text)
+    }
+
+    @Test
+    fun `regular text is used when big text is absent`() {
+        val notification = Notification().apply {
+            extras.putCharSequence(Notification.EXTRA_TEXT, "regular text")
+        }
+
+        val extracted = NotificationTextExtractor.extract(notification)
+
+        assertEquals("regular text", extracted.text)
     }
 
     @Test
@@ -83,6 +117,7 @@ class NotificationMappingTest {
         assertEquals("missing", resolver.resolve("not.installed.missing"))
     }
 
+    @Suppress("DEPRECATION")
     private fun statusBarNotification(
         packageName: String,
         id: Int = 1,
