@@ -39,9 +39,7 @@ class RoomNotificationRepositoryTest {
             .allowMainThreadQueries()
             .build()
         repository = RoomNotificationRepository(
-            notificationDao = database.notificationDao(),
-            appRuleDao = database.appRuleDao(),
-            classificationStatsDao = database.classificationStatsDao(),
+            database = database,
             clock = clock
         )
     }
@@ -83,6 +81,7 @@ class RoomNotificationRepositoryTest {
         assertEquals(NotificationDecision.KeepNow, item.userDecision)
         assertEquals(NotificationDecision.KeepNow, item.category)
         assertEquals(DecisionSource.UserOverride, item.decisionSource)
+        assertEquals("test", item.automaticReason)
     }
 
     @Test
@@ -150,6 +149,28 @@ class RoomNotificationRepositoryTest {
         assertEquals(2L, stats.appChangeCounts["com.example.app"])
         assertEquals(1L, stats.selectedByDecision[NotificationDecision.KeepNow])
         assertEquals(1L, stats.selectedByDecision[NotificationDecision.Ignore])
+    }
+
+    @Test
+    fun `notification decision rolls back when statistics update fails`() = runTest {
+        repository.upsert(record(key = "rollback"))
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER fail_stats_insert
+            BEFORE INSERT ON classification_stats
+            BEGIN
+                SELECT RAISE(ABORT, 'forced stats failure');
+            END
+            """.trimIndent()
+        )
+
+        val result = runCatching {
+            repository.setNotificationDecision("rollback", NotificationDecision.KeepNow)
+        }
+
+        assertTrue(result.isFailure)
+        assertNull(database.notificationDao().getByKey("rollback")?.userDecision)
+        assertEquals(0L, repository.observeClassificationStats().first().userOverrideChanges)
     }
 
     @Test
