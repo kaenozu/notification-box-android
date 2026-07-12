@@ -20,7 +20,8 @@ class NotificationDatabaseMigrationInstrumentedTest {
     @get:Rule
     val migrationHelper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
-        NotificationDatabase::class.java.canonicalName,
+        NotificationDatabase::class.java,
+        emptyList(),
         FrameworkSQLiteOpenHelperFactory()
     )
 
