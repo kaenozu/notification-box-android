@@ -15,6 +15,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -33,6 +34,15 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        managedDevices {
+            localDevices {
+                create("pixel2Api30") {
+                    device = "Pixel 2"
+                    apiLevel = 30
+                    systemImageSource = "aosp-atd"
+                }
+            }
+        }
     }
 
     lint {
@@ -76,4 +86,8 @@ dependencies {
     testImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.room:room-testing:2.8.4")
+
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.room:room-testing:2.8.4")
 }
