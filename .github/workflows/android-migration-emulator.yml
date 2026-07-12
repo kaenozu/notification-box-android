@@ -101,7 +101,6 @@ jobs:
     timeout-minutes: 40
     env:
       V1_BASELINE: b32d2e4835997eada837df1ca1d3b15c760002a7
-      V1_DIR: ${{ runner.temp }}/notification-box-v1
 
     steps:
       - name: Checkout tested revision
@@ -128,6 +127,7 @@ jobs:
 
       - name: Build v1 and v2 APKs
         run: |
+          V1_DIR="$RUNNER_TEMP/notification-box-v1"
           git worktree add "$V1_DIR" "$V1_BASELINE"
           chmod +x "$V1_DIR/gradlew"
           "$V1_DIR/gradlew" -p "$V1_DIR" assembleDebug --no-daemon
@@ -150,7 +150,7 @@ jobs:
             -camera-back none
           script: >-
             bash .github/scripts/verify-installed-apk-migration.sh
-            "$V1_DIR/app/build/outputs/apk/debug/app-debug.apk"
+            "$RUNNER_TEMP/notification-box-v1/app/build/outputs/apk/debug/app-debug.apk"
             "app/build/outputs/apk/debug/app-debug.apk"
 
       - name: Upload installed migration diagnostics
