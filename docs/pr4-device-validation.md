@@ -4,18 +4,31 @@
 
 この文書は、CIで自動確認できるRoom移行と、物理Android端末でのみ確認できるNotificationListener・OS通知非破壊性・OEM固有挙動を分離して記録します。
 
-## 0. 2026-07-12 実施記録
+## 記録方針
+
+このtracked文書へ検証後の最新PR HEADを書き込むと、その記録コミット自身によってHEADが変わります。そのため、次の方式で記録します。
+
+- この文書には、再実施可能な手順と過去に完了した自動検証の対象コードコミットを記録する。
+- 物理端末検証を開始する直前に実装を固定し、`git rev-parse HEAD`で検証対象SHAを取得する。
+- 物理端末での実施結果、端末情報、検証対象SHAは、trackedファイルを変更しないPRコメントへ記録する。
+- 物理端末検証後にtrackedファイルへ変更が入った場合は、変更内容にかかわらず検証対象SHAと最新PR HEADが不一致になるため、Ready化前に再検証する。
+- PR本文のCI Runと検証記録は履歴として保持し、現在のPR HEADを表す値と混同しない。
+
+## 0. 2026-07-12 自動検証実施記録
 
 | 項目 | 結果 |
 | --- | --- |
-| 自動検証対象HEAD | `7d04a1708f01758c620f43760d10a6629c56b615` |
+| 自動検証対象コードコミット | `72f3057e541332484334bfd389df832973afbc84` |
 | v1基準SHA | `b32d2e4835997eada837df1ca1d3b15c760002a7` |
-| Android Migration Emulator Run | `29193022007` — PASS |
+| Android CI Run | `29193476128` — PASS |
+| Android Migration Emulator Run | `29193476097` — PASS |
 | Room `MigrationTestHelper` | 1 passed / 0 failed / 0 errors / 0 skipped |
 | v1 APK→v2 APK上書き移行 | API 30エミュレータでPASS |
 | 物理Android端末 | BLOCKED — 実行環境へUSB端末が公開されていない |
 | ADB実機接続 | BLOCKED — 実行環境にADBとUSBデバイスがない |
 | Ready化可否 | 不可 |
+
+`72f3057e541332484334bfd389df832973afbc84`は、上記自動検証で確認したアプリ・CI実装のコード状態です。後続の記録専用変更を含む現在のPR HEADを表す値ではありません。アプリ、ビルド設定、Room schema、migration、テストまたはworkflowへ変更が入った場合は、新しいHEADで自動検証を再実行して記録を更新します。
 
 自動上書き移行では、実際にv1 APKをインストールし、Room v1データベースを配置した後、v2 APKを`adb install -r`で上書きしました。確認結果は次のとおりです。
 
@@ -34,30 +47,40 @@
 
 ## 1. 物理端末の検証情報
 
+物理端末検証の結果はPRコメントへ記録します。次の表をコメントへコピーし、空欄を埋めてください。
+
 | 項目 | 記録 |
 | --- | --- |
-| 検証日 | 2026-07-12（接続試行） |
-| 検証者 | GitHub連携実行環境 |
-| PR HEAD | BLOCKED — 物理端末未接続 |
+| 検証日 |  |
+| 検証者 |  |
+| 検証対象PR HEAD |  |
 | v1基準SHA | `b32d2e4835997eada837df1ca1d3b15c760002a7` |
-| 端末メーカー・機種 | BLOCKED — 端末なし |
-| Androidバージョン | BLOCKED — 端末なし |
-| セキュリティパッチ | BLOCKED — 端末なし |
-| 新規インストール / 上書き | 物理端末: BLOCKED / API 30エミュレータ: PASS |
+| 端末メーカー・機種 |  |
+| Androidバージョン |  |
+| セキュリティパッチ |  |
+| 接続方法 | USB / Wireless debugging |
+| 新規インストール / 上書き |  |
 
-物理端末で再実施するときは、開始前に最新HEADを記録します。
+開始前に、PRの最新状態を取得し、HEADを記録します。
 
 ```powershell
+git fetch origin
+git switch feat/p2-notification-rules
+git pull --ff-only
 git rev-parse HEAD
 ```
+
+このSHAを物理端末検証中に変更しないでください。別コミットがpushされた場合は、最新HEADを取得して最初から再実施します。
 
 ## 2. ビルドとインストール
 
 ```powershell
 .\gradlew.bat assembleDebug --no-build-cache
-adb devices
+adb devices -l
 adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 ```
+
+`adb devices -l`で対象端末の状態が`device`であり、検証対象の物理端末だけが接続されていることを確認します。`emulator-`で始まるserialは物理端末検証には使用しません。
 
 アプリデータを維持する検証では、`adb uninstall`や「ストレージを消去」を実行しないでください。
 
@@ -139,6 +162,7 @@ adb shell am force-stop com.notificationbox.app
 | --- | --- | --- |
 | 手動分類でOS通知が消えない | BLOCKED | 物理通知シェードを確認できない |
 | ルール変更でOS通知が消えない | BLOCKED | 物理通知シェードを確認できない |
+| ピン留めでOS通知が消えない | BLOCKED | 物理通知シェードを確認できない |
 | 履歴削除でOS通知が消えない | BLOCKED | 物理通知シェードを確認できない |
 | snooze・抑制・遅延が発生しない | BLOCKED | 物理端末での時間経過確認が必要 |
 
@@ -157,30 +181,36 @@ adb shell am force-stop com.notificationbox.app
 
 ## 7. logcatへの通知内容漏えい確認
 
-通知タイトルまたは本文に、他と重複しないマーカーを含めます。
+通知タイトルまたは本文に、他と重複しないマーカーを含めます。検証日ごとに新しい値へ変更してください。
 
 ```text
-NBX_PRIVATE_MARKER_20260712
+NBX_PRIVATE_MARKER_YYYYMMDD_RANDOM
 ```
 
 アプリプロセスのログだけを採取します。
 
 ```powershell
+$marker = "NBX_PRIVATE_MARKER_YYYYMMDD_RANDOM"
 adb logcat -c
 
-# マーカーを含む通知を送信し、アプリで履歴・分類画面を操作する
+# $markerを含む通知を送信し、アプリで履歴・分類画面を操作する
 
 $pid = (adb shell pidof com.notificationbox.app).Trim()
 if (-not $pid) {
     throw "Notification Box process is not running"
 }
 adb logcat -d --pid=$pid > .\pr4-notification-box-logcat.txt
-Select-String -Path .\pr4-notification-box-logcat.txt -Pattern "NBX_PRIVATE_MARKER_20260712"
+$matches = @(Select-String -Path .\pr4-notification-box-logcat.txt -SimpleMatch $marker)
+"markerMatches=$($matches.Count)"
 ```
 
-期待結果: `Select-String`の一致結果が0件。
+期待結果: `markerMatches=0`。
 
-通知タイトル・本文、端末所有者情報、アカウント情報を含む生ログはPRへ添付しません。マーカー検索結果だけを記録します。
+通知タイトル・本文、端末所有者情報、アカウント情報を含む生ログはPRへ添付しません。PRへ記録するのはマーカー文字列を伏せた一致件数だけです。確認後、生ログを安全に削除します。
+
+```powershell
+Remove-Item .\pr4-notification-box-logcat.txt -Force
+```
 
 | 確認項目 | 結果 | 備考 |
 | --- | --- | --- |
@@ -219,25 +249,68 @@ adb install -r ..\notification-box-v1\app\build\outputs\apk\debug\app-debug.apk
 adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 ```
 
+この工程では`adb uninstall`、アプリデータ削除、端末設定からのストレージ消去を行いません。
+
 | 確認項目 | 物理端末 | API 30エミュレータ | 備考 |
 | --- | --- | --- | --- |
-| v2上書き後に起動できる | BLOCKED | PASS | Run `29193022007` |
+| v2上書き後に起動できる | BLOCKED | PASS | Run `29193476097` |
 | v1履歴を保持する | BLOCKED | PASS | 合成v1データを保持 |
 | v1ピン留めを保持する | BLOCKED | PASS | `userPinned=1`を保持 |
 | 既存`userDecision`が未設定 | BLOCKED | PASS | NULLを確認 |
 | 新規ルールを作成できる | BLOCKED | PASS | `app_rules`書き込み確認 |
 | 分類統計を更新できる | BLOCKED | PASS | `classification_stats`書き込み確認 |
 
-## 9. 最終判定
+## 9. PRコメント用の実施結果テンプレート
+
+物理端末検証完了後は、次のテンプレートをPRコメントへ貼り付けます。通知タイトル・本文、生logcat、個人情報を含むスクリーンショットは添付しません。
+
+```markdown
+## PR #4 物理端末検証結果
+
+- 検証日:
+- 検証者:
+- 検証対象HEAD:
+- v1基準SHA: `b32d2e4835997eada837df1ca1d3b15c760002a7`
+- メーカー・機種:
+- Androidバージョン:
+- セキュリティパッチ:
+- 接続方法:
+
+| 確認項目 | 結果 | 備考 |
+| --- | --- | --- |
+| 通知アクセス許可・解除・再許可 |  |  |
+| 実通知の履歴取り込み |  |  |
+| 手動分類の設定・解除 |  |  |
+| アプリルールの設定・解除 |  |  |
+| 手動分類 > アプリルール > 自動分類 |  |  |
+| 同一通知再投稿後の分類保持 |  |  |
+| 強制停止・再起動後の保持 |  |  |
+| OS通知の非破壊性 |  |  |
+| snooze・抑制・遅延なし |  |  |
+| 履歴削除とルール削除の分離 |  |  |
+| logcat marker matches |  | 一致件数のみ記録 |
+| 物理端末v1→v2上書き移行 |  |  |
+
+- 総合判定: PASS / FAIL / BLOCKED
+- 未解決事項:
+- Ready化可否: 可 / 不可
+- 未解決review thread数:
+```
+
+## 10. 最終判定
 
 以下をすべて満たした場合のみ、PRをReady for reviewへ移行できます。
 
 - 全必須項目がPASS
 - FAIL項目に未解決のものがない
 - 実機名とAndroidバージョンが記録されている
-- 検証HEADがPRの最新HEADと一致する
+- 物理端末の検証対象HEADがPRの最新HEADと一致する
 - v1基準SHAがRoom DB version 1のコミットと一致する
+- OS通知の非破壊性を目視確認している
+- logcatのマーカー一致件数が0件
 - 通知内容を含むログやスクリーンショットを公開していない
+- 物理端末検証結果をPRコメントへ記録している
+- 未解決review threadが0件
 
 | 判定 | 値 |
 | --- | --- |
