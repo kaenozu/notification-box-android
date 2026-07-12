@@ -11,6 +11,7 @@
 | 検証日 |  |
 | 検証者 |  |
 | PR HEAD |  |
+| v1基準SHA | `b32d2e4835997eada837df1ca1d3b15c760002a7` |
 | 端末メーカー・機種 |  |
 | Androidバージョン |  |
 | セキュリティパッチ |  |
@@ -57,7 +58,7 @@ adb shell settings get secure enabled_notification_listeners
 
 ## 3. 通知取り込みと分類
 
-テスト用アプリから、識別しやすい通知を複数送信します。
+テスト用アプリから、識別しやすい通知を複数送信します。再投稿保持を確認するときは、同じ送信元パッケージ・notification ID・tagの組み合わせで通知を更新してください。別IDで新規投稿した通知は別通知として扱われます。
 
 1. 通知が履歴へ表示される。
 2. 通知単位で分類を変更できる。
@@ -66,7 +67,13 @@ adb shell settings get secure enabled_notification_listeners
 5. ルール設定後の新しい通知にルールが適用される。
 6. 個別の手動分類がアプリルールより優先される。
 7. ルールを削除すると自動分類へ戻る。
-8. アプリ再起動後も履歴・手動分類・ルール・ピン留めが保持される。
+8. アプリを強制停止して再起動した後も、履歴・手動分類・ルール・ピン留めが保持される。
+
+アプリ再起動の確認では、画面を閉じるだけでなくプロセスを停止してから手動で再起動します。
+
+```powershell
+adb shell am force-stop com.notificationbox.app
+```
 
 期待する優先順位:
 
@@ -81,7 +88,7 @@ adb shell settings get secure enabled_notification_listeners
 | 再投稿後も手動分類を保持する | NOT RUN |  |
 | アプリルールを設定・解除できる | NOT RUN |  |
 | 優先順位が正しい | NOT RUN |  |
-| 再起動後もデータを保持する | NOT RUN |  |
+| 強制停止・再起動後もデータを保持する | NOT RUN |  |
 
 ## 4. OS通知の非破壊性
 
@@ -131,13 +138,16 @@ adb logcat -c
 # マーカーを含む通知を送信し、アプリで履歴・分類画面を操作する
 
 $pid = (adb shell pidof com.notificationbox.app).Trim()
+if (-not $pid) {
+    throw "Notification Box process is not running"
+}
 adb logcat -d --pid=$pid > .\pr4-notification-box-logcat.txt
 Select-String -Path .\pr4-notification-box-logcat.txt -Pattern "NBX_PRIVATE_MARKER_20260712"
 ```
 
 期待結果: `Select-String`の一致結果が0件。
 
-ログをPRへ添付する場合は、通知タイトル・本文、端末所有者情報、アカウント情報が含まれていないことを確認してください。
+ログをPRへ添付する場合は、通知タイトル・本文、端末所有者情報、アカウント情報が含まれていないことを確認してください。マーカー検索の結果だけを記録し、未確認の生ログは添付しないでください。
 
 | 確認項目 | 結果 | 備考 |
 | --- | --- | --- |
@@ -147,15 +157,20 @@ Select-String -Path .\pr4-notification-box-logcat.txt -Pattern "NBX_PRIVATE_MARK
 
 ### 7.1 v1版を用意する
 
-`main`のDB v1版を別ディレクトリでビルドします。
+DB version 1であることを確認済みのPR基準コミットを、別ディレクトリへdetached worktreeとして展開します。可変の`origin/main`を直接使うと、検証時点でmainが更新されてv1ではなくなる可能性があるため使用しません。
 
 ```powershell
+$v1Baseline = "b32d2e4835997eada837df1ca1d3b15c760002a7"
 git fetch origin
-git worktree add ..\notification-box-v1 origin/main
+git cat-file -e "${v1Baseline}^{commit}"
+git worktree add --detach ..\notification-box-v1 $v1Baseline
 Push-Location ..\notification-box-v1
+git rev-parse HEAD
 .\gradlew.bat assembleDebug --no-build-cache
 Pop-Location
 ```
+
+`git rev-parse HEAD`の結果が検証情報のv1基準SHAと一致することを確認します。PRをrebaseして基準コミットを変更する場合は、新しい基準がRoom DB version 1であることをコード上で再確認してから、この手順と記録欄を更新してください。
 
 ### 7.2 v1版にデータを作る
 
@@ -202,6 +217,7 @@ adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 - FAIL項目に未解決のものがない
 - 実機名とAndroidバージョンが記録されている
 - 検証HEADがPRの最新HEADと一致する
+- v1基準SHAが記録済みで、Room DB version 1のコミットと一致する
 - 通知内容を含むログやスクリーンショットを公開していない
 
 | 判定 | 値 |
