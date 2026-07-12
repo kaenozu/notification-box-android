@@ -1,10 +1,9 @@
 package com.notificationbox.app.data.repository
 
-import com.notificationbox.app.data.db.AppRuleDao
+import androidx.room.withTransaction
 import com.notificationbox.app.data.db.AppRuleEntity
 import com.notificationbox.app.data.db.ClassificationStatEntity
-import com.notificationbox.app.data.db.ClassificationStatsDao
-import com.notificationbox.app.data.db.NotificationDao
+import com.notificationbox.app.data.db.NotificationDatabase
 import com.notificationbox.app.data.db.NotificationEntity
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
@@ -14,18 +13,21 @@ import com.notificationbox.app.model.NotificationItem
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class RoomNotificationRepository(
-    private val notificationDao: NotificationDao,
-    private val appRuleDao: AppRuleDao,
-    private val classificationStatsDao: ClassificationStatsDao,
+    private val database: NotificationDatabase,
     private val clock: Clock = Clock.systemUTC()
 ) : NotificationRepository {
+    private val notificationDao = database.notificationDao()
+    private val appRuleDao = database.appRuleDao()
+    private val classificationStatsDao = database.classificationStatsDao()
     private val mutationMutex = Mutex()
 
     override fun observeNotifications(): Flow<List<NotificationItem>> =
@@ -35,7 +37,7 @@ class RoomNotificationRepository(
         ) { entities, rules ->
             val rulesByPackage = rules.associateBy(AppRuleEntity::packageName)
             entities.map { entity -> entity.toModel(rulesByPackage[entity.packageName]) }
-        }
+        }.flowOn(Dispatchers.Default)
 
     override fun observeAppRules(): Flow<List<AppRule>> =
         appRuleDao.observeAll().map { rules -> rules.map { it.toModel() } }
@@ -45,8 +47,10 @@ class RoomNotificationRepository(
 
     override suspend fun upsert(notification: NotificationRecord) {
         mutationMutex.withLock {
-            upsertLocked(notification)
-            pruneLocked()
+            database.withTransaction {
+                upsertLocked(notification)
+                pruneLocked()
+            }
         }
     }
 
@@ -56,13 +60,15 @@ class RoomNotificationRepository(
         synchronizedAtMillis: Long
     ) {
         mutationMutex.withLock {
-            if (activeKeys.isEmpty()) {
-                notificationDao.markAllActiveRemoved(synchronizedAtMillis)
-            } else {
-                notificationDao.markActiveMissing(activeKeys.toList(), synchronizedAtMillis)
+            database.withTransaction {
+                if (activeKeys.isEmpty()) {
+                    notificationDao.markAllActiveRemoved(synchronizedAtMillis)
+                } else {
+                    notificationDao.markActiveMissing(activeKeys.toList(), synchronizedAtMillis)
+                }
+                notifications.forEach { upsertLocked(it) }
+                pruneLocked()
             }
-            notifications.forEach { upsertLocked(it) }
-            pruneLocked()
         }
     }
 
@@ -83,15 +89,17 @@ class RoomNotificationRepository(
         decision: NotificationDecision?
     ) {
         mutationMutex.withLock {
-            val existing = notificationDao.getByKey(key) ?: return@withLock
-            val serialized = decision?.name
-            if (existing.userDecision == serialized) return@withLock
+            database.withTransaction {
+                val existing = notificationDao.getByKey(key) ?: return@withTransaction
+                val serialized = decision?.name
+                if (existing.userDecision == serialized) return@withTransaction
 
-            notificationDao.setUserDecision(key, serialized)
-            classificationStatsDao.increment(STAT_USER_OVERRIDE_CHANGES)
-            classificationStatsDao.increment(appChangeKey(existing.packageName))
-            decision?.let {
-                classificationStatsDao.increment(selectedDecisionKey(it))
+                notificationDao.setUserDecision(key, serialized)
+                classificationStatsDao.increment(STAT_USER_OVERRIDE_CHANGES)
+                classificationStatsDao.increment(appChangeKey(existing.packageName))
+                decision?.let {
+                    classificationStatsDao.increment(selectedDecisionKey(it))
+                }
             }
         }
     }
@@ -102,28 +110,30 @@ class RoomNotificationRepository(
         decision: NotificationDecision?
     ) {
         mutationMutex.withLock {
-            val existing = appRuleDao.getByPackageName(packageName)
-            if (decision == null) {
-                if (existing == null) return@withLock
-                appRuleDao.delete(packageName)
-            } else {
-                if (existing?.decision == decision.name && existing.appLabel == appLabel) {
-                    return@withLock
-                }
-                appRuleDao.upsert(
-                    AppRuleEntity(
-                        packageName = packageName,
-                        appLabel = appLabel,
-                        decision = decision.name,
-                        updatedAtMillis = clock.millis()
+            database.withTransaction {
+                val existing = appRuleDao.getByPackageName(packageName)
+                if (decision == null) {
+                    if (existing == null) return@withTransaction
+                    appRuleDao.delete(packageName)
+                } else {
+                    if (existing?.decision == decision.name && existing.appLabel == appLabel) {
+                        return@withTransaction
+                    }
+                    appRuleDao.upsert(
+                        AppRuleEntity(
+                            packageName = packageName,
+                            appLabel = appLabel,
+                            decision = decision.name,
+                            updatedAtMillis = clock.millis()
+                        )
                     )
-                )
-            }
+                }
 
-            classificationStatsDao.increment(STAT_APP_RULE_CHANGES)
-            classificationStatsDao.increment(appChangeKey(packageName))
-            decision?.let {
-                classificationStatsDao.increment(selectedDecisionKey(it))
+                classificationStatsDao.increment(STAT_APP_RULE_CHANGES)
+                classificationStatsDao.increment(appChangeKey(packageName))
+                decision?.let {
+                    classificationStatsDao.increment(selectedDecisionKey(it))
+                }
             }
         }
     }
@@ -192,13 +202,6 @@ class RoomNotificationRepository(
             ruleDecision != null -> DecisionSource.AppRule
             else -> DecisionSource.Automatic
         }
-        val displayReason = when (source) {
-            DecisionSource.UserOverride ->
-                "ユーザーがこの通知を「${finalDecision.displayName()}」に変更"
-            DecisionSource.AppRule ->
-                "${appLabel}を「${finalDecision.displayName()}」に設定済み"
-            DecisionSource.Automatic -> reason
-        }
 
         return NotificationItem(
             key = key,
@@ -213,7 +216,7 @@ class RoomNotificationRepository(
             category = finalDecision,
             decisionSource = source,
             automaticReason = reason,
-            reason = displayReason,
+            reason = reason,
             userPinned = userPinned,
             isActive = isActive,
             removedAt = removedAtMillis?.let(Instant::ofEpochMilli)
@@ -255,12 +258,6 @@ class RoomNotificationRepository(
 
     private fun String.toDecisionOrDefault(): NotificationDecision =
         toDecisionOrNull() ?: NotificationDecision.HoldForDigest
-
-    private fun NotificationDecision.displayName(): String = when (this) {
-        NotificationDecision.KeepNow -> "即時"
-        NotificationDecision.HoldForDigest -> "あとで確認"
-        NotificationDecision.Ignore -> "低優先"
-    }
 
     companion object {
         internal const val MAX_NOTIFICATION_COUNT = 500
