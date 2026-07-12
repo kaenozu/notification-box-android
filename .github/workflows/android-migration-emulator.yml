@@ -1,0 +1,89 @@
+name: Android Migration Emulator
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/android-migration-emulator.yml"
+      - "app/build.gradle.kts"
+      - "app/schemas/**"
+      - "app/src/androidTest/**"
+      - "app/src/main/java/com/notificationbox/app/data/db/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/android-migration-emulator.yml"
+      - "app/build.gradle.kts"
+      - "app/schemas/**"
+      - "app/src/androidTest/**"
+      - "app/src/main/java/com/notificationbox/app/data/db/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-room-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Enable Gradle and KVM access
+        run: |
+          chmod +x gradlew
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          fi
+
+      - name: Run Room migration instrumentation test
+        id: migration
+        run: |
+          set +e
+          ./gradlew pixel2Api30DebugAndroidTest \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            --no-daemon \
+            --stacktrace > migration-emulator.log 2>&1
+          exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          if [ "$exit_code" -ne 0 ]; then
+            cat migration-emulator.log
+          fi
+          exit 0
+
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-migration-emulator-diagnostics
+          path: |
+            migration-emulator.log
+            app/build/outputs/androidTest-results/managedDevice
+            app/build/reports/androidTests/managedDevice
+          if-no-files-found: warn
+
+      - name: Verify migration outcome
+        if: always()
+        env:
+          MIGRATION_EXIT: ${{ steps.migration.outputs.exit_code }}
+        run: |
+          if [ "$MIGRATION_EXIT" != "0" ]; then
+            echo "Managed-device migration test exit: $MIGRATION_EXIT"
+            exit 1
+          fi
