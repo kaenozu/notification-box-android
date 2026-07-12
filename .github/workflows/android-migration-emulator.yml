@@ -52,6 +52,12 @@ jobs:
             sudo chmod 666 /dev/kvm
           fi
 
+      - name: Accept SDK licenses and install ATD image
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "system-images;android-30;aosp_atd;x86"
+
       - name: Run Room migration instrumentation test
         id: migration
         run: |
