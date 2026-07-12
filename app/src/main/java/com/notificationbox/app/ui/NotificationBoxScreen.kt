@@ -44,12 +44,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
@@ -57,12 +60,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.notificationbox.app.BuildConfig
+import com.notificationbox.app.R
 import com.notificationbox.app.model.AppMode
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private enum class HomeSection {
     Notifications,
@@ -342,7 +348,7 @@ private fun NotificationCard(
                 }
             }
             item.text?.let { Text(it) }
-            Text(item.reason)
+            Text(item.displayReason())
             Text(
                 "判定: ${item.category.displayName()} / ${item.decisionSource.displayName()} / " +
                     if (item.isActive) "端末に表示中" else "端末から消去済み",
@@ -480,20 +486,37 @@ private fun AppRuleDialog(
 }
 
 @Composable
+private fun NotificationItem.displayReason(): String = when (decisionSource) {
+    DecisionSource.Automatic -> automaticReason
+    DecisionSource.AppRule -> stringResource(
+        R.string.notification_reason_app_rule,
+        appLabel,
+        category.displayName()
+    )
+    DecisionSource.UserOverride -> stringResource(
+        R.string.notification_reason_user_override,
+        category.displayName()
+    )
+}
+
+@Composable
 private fun AppIcon(packageName: String, appLabel: String) {
     val context = LocalContext.current
-    val bitmap = remember(packageName) {
-        runCatching {
-            context.packageManager
-                .getApplicationIcon(packageName)
-                .toBitmap(width = 48, height = 48)
-                .asImageBitmap()
-        }.getOrNull()
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, packageName) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.packageManager
+                    .getApplicationIcon(packageName)
+                    .toBitmap(width = 48, height = 48)
+                    .asImageBitmap()
+            }.getOrNull()
+        }
     }
 
-    if (bitmap != null) {
+    val loadedBitmap = bitmap
+    if (loadedBitmap != null) {
         Image(
-            bitmap = bitmap,
+            bitmap = loadedBitmap,
             contentDescription = "${appLabel}のアイコン",
             modifier = Modifier
                 .size(40.dp)
