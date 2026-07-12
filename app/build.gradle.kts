@@ -35,6 +35,10 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
+    lint {
+        lintConfig = file("lint.xml")
+    }
+
     sourceSets {
         getByName("test").assets.srcDir("$projectDir/schemas")
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
