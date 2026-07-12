@@ -150,14 +150,14 @@ jobs:
         shell: pwsh
         run: |
           $log = Join-Path $env:RUNNER_TEMP "dependency-insight-windows.log"
-          & .\gradlew.bat dependencyInsight `
+          & .\gradlew.bat :app:dependencyInsight `
             --dependency org.robolectric:robolectric `
-            --configuration testDebugUnitTestRuntimeClasspath `
+            --configuration debugUnitTestRuntimeClasspath `
             --no-daemon 2>&1 | Tee-Object -FilePath $log
           $exitCode = $LASTEXITCODE
           $resolved = Select-String -Path $log -Pattern 'org\.robolectric:robolectric:4\.16\.1' -Quiet
           if (-not $resolved) {
-            Write-Error "Robolectric 4.16.1 was not resolved."
+            Write-Host "Robolectric 4.16.1 was not resolved."
             $exitCode = 1
           }
           "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
@@ -182,11 +182,28 @@ jobs:
             --stacktrace `
             --no-daemon 2>&1 | Tee-Object -FilePath $log
           $exitCode = $LASTEXITCODE
+
           $legacyBackend = Select-String -Path $log -Pattern 'ShadowLegacySQLiteConnection' -Quiet
           if ($legacyBackend) {
-            Write-Error "ShadowLegacySQLiteConnection was detected."
+            Write-Host "ShadowLegacySQLiteConnection was detected."
             $exitCode = 1
           }
+
+          $testCount = 0
+          $testResultFiles = Get-ChildItem `
+            .\app\build\test-results\testDebugUnitTest\TEST-*.xml `
+            -ErrorAction SilentlyContinue
+          foreach ($testResultFile in $testResultFiles) {
+            [xml]$result = Get-Content -Raw $testResultFile.FullName
+            $testCount += [int]$result.testsuite.tests
+          }
+          Write-Host "Windows unit test count: $testCount"
+          if ($testCount -lt 47) {
+            Write-Host "Expected at least 47 Windows unit tests."
+            $exitCode = 1
+          }
+
+          "test_count=$testCount" >> $env:GITHUB_OUTPUT
           "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
           exit 0
 
@@ -274,6 +291,7 @@ jobs:
         env:
           ROBOLECTRIC_EXIT: ${{ steps.robolectric.outputs.exit_code }}
           UNIT_EXIT: ${{ steps.unit_tests_windows.outputs.exit_code }}
+          TEST_COUNT: ${{ steps.unit_tests_windows.outputs.test_count }}
           LINT_EXIT: ${{ steps.lint_windows.outputs.exit_code }}
           ASSEMBLE_EXIT: ${{ steps.assemble_windows.outputs.exit_code }}
           REPOSITORY_EXIT: ${{ steps.repository_windows.outputs.exit_code }}
@@ -285,9 +303,11 @@ jobs:
             $env:ASSEMBLE_EXIT,
             $env:REPOSITORY_EXIT
           )
-          if ($results -contains $null -or $results -contains "" -or $results -contains "1") {
+          $failedResults = $results | Where-Object { $_ -ne "0" }
+          if ($failedResults.Count -gt 0) {
             Write-Host "Robolectric exit: $env:ROBOLECTRIC_EXIT"
             Write-Host "Unit tests exit: $env:UNIT_EXIT"
+            Write-Host "Windows test count: $env:TEST_COUNT"
             Write-Host "Lint exit: $env:LINT_EXIT"
             Write-Host "Assemble exit: $env:ASSEMBLE_EXIT"
             Write-Host "Repository exit: $env:REPOSITORY_EXIT"
