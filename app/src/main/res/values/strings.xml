@@ -1,0 +1,4 @@
+<resources>
+    <string name="notification_reason_app_rule">%1$sを「%2$s」に設定済み</string>
+    <string name="notification_reason_user_override">ユーザーがこの通知を「%1$s」に変更</string>
+</resources>
