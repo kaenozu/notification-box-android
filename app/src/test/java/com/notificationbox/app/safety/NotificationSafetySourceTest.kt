@@ -69,7 +69,7 @@ class NotificationSafetySourceTest {
             Paths.get("src", "main", "java"),
             Paths.get("app", "src", "main", "java")
         )
-        return candidates.firstOrNull(Files::isDirectory)
+        return candidates.firstOrNull { candidate -> Files.isDirectory(candidate) }
             ?: error("Production source root was not found from ${Paths.get("").toAbsolutePath()}")
     }
 }
