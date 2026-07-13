@@ -64,6 +64,17 @@ class NotificationDaoTest {
     }
 
     @Test
+    fun `manual decision can be set and cleared`() = runTest {
+        dao.upsert(entity(key = "decision"))
+
+        dao.setUserDecision("decision", "KeepNow")
+        assertEquals("KeepNow", dao.getByKey("decision")?.userDecision)
+
+        dao.setUserDecision("decision", null)
+        assertNull(dao.getByKey("decision")?.userDecision)
+    }
+
+    @Test
     fun `pin state is persisted`() = runTest {
         dao.upsert(entity(key = "pinned"))
 
@@ -141,6 +152,7 @@ class NotificationDaoTest {
         key: String,
         title: String? = "title",
         postTimeMillis: Long = 1_000,
+        userDecision: String? = null,
         userPinned: Boolean = false,
         isActive: Boolean = true
     ): NotificationEntity =
@@ -156,6 +168,7 @@ class NotificationDaoTest {
             channelId = "channel",
             category = "HoldForDigest",
             reason = "test",
+            userDecision = userDecision,
             userPinned = userPinned,
             isActive = isActive,
             removedAtMillis = if (isActive) null else postTimeMillis

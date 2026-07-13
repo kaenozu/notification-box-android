@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.notificationbox.app.data.db.NotificationDatabase
 import com.notificationbox.app.data.db.NotificationEntity
+import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.NotificationDecision
 import java.time.Clock
 import java.time.Instant
@@ -37,7 +38,10 @@ class RoomNotificationRepositoryTest {
         database = Room.inMemoryDatabaseBuilder(context, NotificationDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repository = RoomNotificationRepository(database.notificationDao(), clock)
+        repository = RoomNotificationRepository(
+            database = database,
+            clock = clock
+        )
     }
 
     @After
@@ -46,15 +50,127 @@ class RoomNotificationRepositoryTest {
     }
 
     @Test
-    fun `reposting same key preserves pin state`() = runTest {
+    fun `reposting same key preserves pin and manual decision`() = runTest {
         repository.upsert(record(key = "same", title = "before"))
         repository.setPinned("same", true)
+        repository.setNotificationDecision("same", NotificationDecision.KeepNow)
 
         repository.upsert(record(key = "same", title = "after"))
 
         val item = repository.observeNotifications().first().single()
         assertEquals("after", item.title)
         assertTrue(item.userPinned)
+        assertEquals(NotificationDecision.KeepNow, item.userDecision)
+        assertEquals(NotificationDecision.KeepNow, item.category)
+    }
+
+    @Test
+    fun `manual decision has precedence over app rule and automatic decision`() = runTest {
+        repository.upsert(record(key = "priority", category = NotificationDecision.Ignore))
+        repository.setAppRule(
+            packageName = "com.example.app",
+            appLabel = "Example",
+            decision = NotificationDecision.HoldForDigest
+        )
+        repository.setNotificationDecision("priority", NotificationDecision.KeepNow)
+
+        val item = repository.observeNotifications().first().single()
+
+        assertEquals(NotificationDecision.Ignore, item.automaticDecision)
+        assertEquals(NotificationDecision.HoldForDigest, item.appRuleDecision)
+        assertEquals(NotificationDecision.KeepNow, item.userDecision)
+        assertEquals(NotificationDecision.KeepNow, item.category)
+        assertEquals(DecisionSource.UserOverride, item.decisionSource)
+        assertEquals("test", item.automaticReason)
+    }
+
+    @Test
+    fun `clearing manual decision falls back to app rule`() = runTest {
+        repository.upsert(record(key = "fallback", category = NotificationDecision.Ignore))
+        repository.setAppRule(
+            packageName = "com.example.app",
+            appLabel = "Example",
+            decision = NotificationDecision.HoldForDigest
+        )
+        repository.setNotificationDecision("fallback", NotificationDecision.KeepNow)
+
+        repository.setNotificationDecision("fallback", null)
+
+        val item = repository.observeNotifications().first().single()
+        assertNull(item.userDecision)
+        assertEquals(NotificationDecision.HoldForDigest, item.category)
+        assertEquals(DecisionSource.AppRule, item.decisionSource)
+    }
+
+    @Test
+    fun `app rule applies to every notification from package`() = runTest {
+        repository.upsert(record(key = "one"))
+        repository.upsert(record(key = "two"))
+
+        repository.setAppRule(
+            packageName = "com.example.app",
+            appLabel = "Example",
+            decision = NotificationDecision.Ignore
+        )
+
+        val items = repository.observeNotifications().first()
+        assertTrue(items.all { it.category == NotificationDecision.Ignore })
+        assertTrue(items.all { it.decisionSource == DecisionSource.AppRule })
+        assertEquals(1, repository.observeAppRules().first().size)
+    }
+
+    @Test
+    fun `automatic classification statistics count new key only once`() = runTest {
+        repository.upsert(record(key = "same", category = NotificationDecision.KeepNow))
+        repository.upsert(record(key = "same", category = NotificationDecision.Ignore))
+        repository.upsert(record(key = "other", category = NotificationDecision.Ignore))
+
+        val stats = repository.observeClassificationStats().first()
+
+        assertEquals(2L, stats.automaticallyClassified)
+        assertEquals(1L, stats.automaticByDecision[NotificationDecision.KeepNow])
+        assertEquals(1L, stats.automaticByDecision[NotificationDecision.Ignore])
+    }
+
+    @Test
+    fun `manual and app rule changes are counted without notification content`() = runTest {
+        repository.upsert(record(key = "stats"))
+        repository.setNotificationDecision("stats", NotificationDecision.KeepNow)
+        repository.setAppRule(
+            packageName = "com.example.app",
+            appLabel = "Example",
+            decision = NotificationDecision.Ignore
+        )
+
+        val stats = repository.observeClassificationStats().first()
+
+        assertEquals(1L, stats.userOverrideChanges)
+        assertEquals(1L, stats.appRuleChanges)
+        assertEquals(2L, stats.appChangeCounts["com.example.app"])
+        assertEquals(1L, stats.selectedByDecision[NotificationDecision.KeepNow])
+        assertEquals(1L, stats.selectedByDecision[NotificationDecision.Ignore])
+    }
+
+    @Test
+    fun `notification decision rolls back when statistics update fails`() = runTest {
+        repository.upsert(record(key = "rollback"))
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER fail_stats_insert
+            BEFORE INSERT ON classification_stats
+            BEGIN
+                SELECT RAISE(ABORT, 'forced stats failure');
+            END
+            """.trimIndent()
+        )
+
+        val result = runCatching {
+            repository.setNotificationDecision("rollback", NotificationDecision.KeepNow)
+        }
+
+        assertTrue(result.isFailure)
+        assertNull(database.notificationDao().getByKey("rollback")?.userDecision)
+        assertEquals(0L, repository.observeClassificationStats().first().userOverrideChanges)
     }
 
     @Test
@@ -152,7 +268,8 @@ class RoomNotificationRepositoryTest {
     private fun record(
         key: String,
         title: String? = "title",
-        postTimeMillis: Long = nowMillis
+        postTimeMillis: Long = nowMillis,
+        category: NotificationDecision = NotificationDecision.HoldForDigest
     ): NotificationRecord =
         NotificationRecord(
             key = key,
@@ -164,13 +281,14 @@ class RoomNotificationRepositoryTest {
             notificationId = 1,
             tag = null,
             channelId = "channel",
-            category = NotificationDecision.HoldForDigest,
+            category = category,
             reason = "test"
         )
 
     private fun entity(
         key: String,
         postTimeMillis: Long = nowMillis,
+        userDecision: String? = null,
         userPinned: Boolean = false,
         category: String = NotificationDecision.HoldForDigest.name,
         isActive: Boolean = true
@@ -187,6 +305,7 @@ class RoomNotificationRepositoryTest {
             channelId = "channel",
             category = category,
             reason = "test",
+            userDecision = userDecision,
             userPinned = userPinned,
             isActive = isActive,
             removedAtMillis = if (isActive) null else postTimeMillis

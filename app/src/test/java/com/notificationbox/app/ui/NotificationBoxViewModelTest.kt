@@ -2,6 +2,9 @@ package com.notificationbox.app.ui
 
 import com.notificationbox.app.data.NotificationStore
 import com.notificationbox.app.data.repository.FakeNotificationRepository
+import com.notificationbox.app.model.AppRule
+import com.notificationbox.app.model.ClassificationStats
+import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
 import com.notificationbox.app.permission.FakePermissionStatusProvider
@@ -64,18 +67,42 @@ class NotificationBoxViewModelTest {
     }
 
     @Test
-    fun `repository flow is reflected in UI state`() = runTest {
+    fun `repository notifications rules and stats are reflected in UI state`() = runTest {
         fakeRepository.emit(listOf(item("notification-key")))
+        fakeRepository.emitRules(
+            listOf(
+                AppRule(
+                    packageName = "com.example.app",
+                    appLabel = "Example",
+                    decision = NotificationDecision.Ignore,
+                    updatedAt = Instant.EPOCH
+                )
+            )
+        )
+        fakeRepository.emitStats(
+            ClassificationStats(
+                automaticallyClassified = 5,
+                userOverrideChanges = 2,
+                appRuleChanges = 1
+            )
+        )
 
         val state = viewModel.state.first()
 
         assertEquals(listOf("notification-key"), state.items.map { it.key })
+        assertEquals(listOf("com.example.app"), state.appRules.map { it.packageName })
+        assertEquals(5, state.classificationStats.automaticallyClassified)
+        assertEquals(2, state.classificationStats.userOverrideChanges)
+        assertEquals(1, state.classificationStats.appRuleChanges)
     }
 
     @Test
-    fun `permission refresh preserves notifications and filter`() = runTest {
+    fun `permission refresh preserves notifications rules and filter`() = runTest {
         NotificationStore.setFilter(NotificationDecision.KeepNow)
         fakeRepository.emit(listOf(item("notification-key")))
+        fakeRepository.emitRules(
+            listOf(AppRule("com.example.app", "Example", NotificationDecision.Ignore, Instant.EPOCH))
+        )
         fakeProvider.listenerGranted = true
 
         viewModel.refreshPermissions()
@@ -84,6 +111,25 @@ class NotificationBoxViewModelTest {
         assertEquals(true, state.notificationAccessGranted)
         assertEquals(NotificationDecision.KeepNow, state.selectedFilter)
         assertEquals(listOf("notification-key"), state.items.map { it.key })
+        assertEquals(1, state.appRules.size)
+    }
+
+    @Test
+    fun `notification and app rule decisions are delegated to repository`() = runTest {
+        fakeRepository.emit(listOf(item("notification-key")))
+
+        viewModel.setNotificationDecision("notification-key", NotificationDecision.Ignore)
+        viewModel.setAppRule("com.example.app", "Example", NotificationDecision.HoldForDigest)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("notification-key" to NotificationDecision.Ignore),
+            fakeRepository.decisionUpdates
+        )
+        assertEquals(
+            listOf(Triple("com.example.app", "Example", NotificationDecision.HoldForDigest)),
+            fakeRepository.appRuleUpdates
+        )
     }
 
     @Test
@@ -109,6 +155,8 @@ class NotificationBoxViewModelTest {
         fakeRepository.emit(listOf(item("notification-key")))
         NotificationStore.setFilter(NotificationDecision.Ignore)
         viewModel.togglePinned("notification-key", true)
+        viewModel.setNotificationDecision("notification-key", NotificationDecision.Ignore)
+        viewModel.setAppRule("com.example.app", "Example", NotificationDecision.Ignore)
         viewModel.delete("notification-key")
         viewModel.clearAll()
         advanceUntilIdle()
@@ -130,7 +178,12 @@ class NotificationBoxViewModelTest {
             title = "Title",
             text = "Text",
             postTime = Instant.ofEpochMilli(1_000),
+            automaticDecision = NotificationDecision.KeepNow,
+            userDecision = null,
+            appRuleDecision = null,
             category = NotificationDecision.KeepNow,
+            decisionSource = DecisionSource.Automatic,
+            automaticReason = "test",
             reason = "test"
         )
 }

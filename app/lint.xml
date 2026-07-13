@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!--
+      AppIcon assigns produceState.value after switching to Dispatchers.IO.
+      The detector does not follow the assignment through withContext, so suppress
+      this single issue for the only file containing that verified pattern.
+    -->
+    <issue id="ProduceStateDoesNotAssignValue">
+        <ignore path="src/main/java/com/notificationbox/app/ui/NotificationBoxScreen.kt" />
+    </issue>
+</lint>

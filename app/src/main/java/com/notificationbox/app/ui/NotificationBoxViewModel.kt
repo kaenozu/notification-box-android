@@ -35,12 +35,16 @@ class NotificationBoxViewModel(
     val state: StateFlow<AppState> = combine(
         NotificationStore.state,
         notificationRepository.observeNotifications(),
+        notificationRepository.observeAppRules(),
+        notificationRepository.observeClassificationStats(),
         permissionState
-    ) { storeState, notifications, permissions ->
+    ) { storeState, notifications, appRules, stats, permissions ->
         storeState.copy(
             notificationAccessGranted = permissions.notificationAccessGranted,
             postNotificationsGranted = permissions.postNotificationsGranted,
-            items = notifications
+            items = notifications,
+            appRules = appRules,
+            classificationStats = stats
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppState())
 
@@ -62,6 +66,22 @@ class NotificationBoxViewModel(
 
     fun togglePinned(key: String, pinned: Boolean) {
         viewModelScope.launch { notificationRepository.setPinned(key, pinned) }
+    }
+
+    fun setNotificationDecision(key: String, decision: NotificationDecision?) {
+        viewModelScope.launch {
+            notificationRepository.setNotificationDecision(key, decision)
+        }
+    }
+
+    fun setAppRule(
+        packageName: String,
+        appLabel: String,
+        decision: NotificationDecision?
+    ) {
+        viewModelScope.launch {
+            notificationRepository.setAppRule(packageName, appLabel, decision)
+        }
     }
 
     fun delete(key: String) {

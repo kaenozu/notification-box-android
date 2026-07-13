@@ -1,0 +1,229 @@
+name: Android Migration Emulator
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/scripts/verify-installed-apk-migration.sh"
+      - ".github/workflows/android-migration-emulator.yml"
+      - "app/build.gradle.kts"
+      - "app/schemas/**"
+      - "app/src/androidTest/**"
+      - "app/src/main/java/com/notificationbox/app/data/db/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/scripts/verify-installed-apk-migration.sh"
+      - ".github/workflows/android-migration-emulator.yml"
+      - "app/build.gradle.kts"
+      - "app/schemas/**"
+      - "app/src/androidTest/**"
+      - "app/src/main/java/com/notificationbox/app/data/db/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-room-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Enable Gradle and KVM access
+        run: |
+          chmod +x gradlew
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          fi
+
+      - name: Accept SDK licenses and install ATD image
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "system-images;android-30;aosp_atd;x86"
+
+      - name: Run Room migration instrumentation test
+        id: migration
+        run: |
+          set +e
+          ./gradlew pixel2Api30DebugAndroidTest \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            --no-daemon \
+            --stacktrace > migration-emulator.log 2>&1
+          exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          if [ "$exit_code" -ne 0 ]; then
+            cat migration-emulator.log
+          fi
+          exit 0
+
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-migration-emulator-diagnostics
+          path: |
+            migration-emulator.log
+            app/build/outputs/androidTest-results/managedDevice
+            app/build/reports/androidTests/managedDevice
+          if-no-files-found: warn
+
+      - name: Verify migration outcome
+        if: always()
+        env:
+          MIGRATION_EXIT: ${{ steps.migration.outputs.exit_code }}
+        run: |
+          if [ "$MIGRATION_EXIT" != "0" ]; then
+            echo "Managed-device migration test exit: $MIGRATION_EXIT"
+            exit 1
+          fi
+
+  verify-installed-apk-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      V1_BASELINE: b32d2e4835997eada837df1ca1d3b15c760002a7
+
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Enable Gradle and KVM access
+        run: |
+          chmod +x gradlew .github/scripts/verify-installed-apk-migration.sh
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          fi
+
+      - name: Build v1 and v2 APKs
+        run: |
+          V1_DIR="$RUNNER_TEMP/notification-box-v1"
+          git worktree add "$V1_DIR" "$V1_BASELINE"
+          chmod +x "$V1_DIR/gradlew"
+          "$V1_DIR/gradlew" -p "$V1_DIR" assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare physical-device APK bundle
+        id: physical_device_bundle
+        run: |
+          set -euo pipefail
+          BUNDLE_DIR="$RUNNER_TEMP/physical-device-apks"
+          TESTED_SHA="$(git rev-parse HEAD)"
+          V1_SHORT="${V1_BASELINE:0:12}"
+          V2_SHORT="${TESTED_SHA:0:12}"
+
+          mkdir -p "$BUNDLE_DIR"
+          cp \
+            "$RUNNER_TEMP/notification-box-v1/app/build/outputs/apk/debug/app-debug.apk" \
+            "$BUNDLE_DIR/notification-box-v1-$V1_SHORT.apk"
+          cp \
+            "app/build/outputs/apk/debug/app-debug.apk" \
+            "$BUNDLE_DIR/notification-box-v2-$V2_SHORT.apk"
+          cp docs/pr4-device-validation.md "$BUNDLE_DIR/"
+
+          (
+            cd "$BUNDLE_DIR"
+            sha256sum ./*.apk > SHA256SUMS.txt
+          )
+
+          {
+            echo "PR #4 physical-device validation bundle"
+            echo "v1 baseline: $V1_BASELINE"
+            echo "v2 tested HEAD: $TESTED_SHA"
+            echo "Use only after Android CI and both Android Migration Emulator jobs pass."
+            echo
+            echo "Fresh/current-version install:"
+            echo "  adb devices -l"
+            echo "  adb install -r notification-box-v2-$V2_SHORT.apk"
+            echo
+            echo "Physical-device v1-to-v2 overwrite migration:"
+            echo "  adb install -r notification-box-v1-$V1_SHORT.apk"
+            echo "  Create notification history and pin at least one item in v1."
+            echo "  Do not uninstall or clear app storage."
+            echo "  adb install -r notification-box-v2-$V2_SHORT.apk"
+            echo
+            echo "Complete every required check in pr4-device-validation.md and post only"
+            echo "the result table, exact HEAD, device details, and log marker match count."
+            echo "Do not upload raw notification logs or notification screenshots."
+          } > "$BUNDLE_DIR/VALIDATION.txt"
+
+          echo "bundle_dir=$BUNDLE_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Verify installed APK overwrite migration
+        id: installed_migration
+        continue-on-error: true
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: >-
+            -no-window
+            -gpu swiftshader_indirect
+            -noaudio
+            -no-boot-anim
+            -camera-back none
+          script: >-
+            bash .github/scripts/verify-installed-apk-migration.sh
+            "$RUNNER_TEMP/notification-box-v1/app/build/outputs/apk/debug/app-debug.apk"
+            "app/build/outputs/apk/debug/app-debug.apk"
+
+      - name: Upload installed migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installed-apk-migration-diagnostics
+          path: installed-apk-migration-report
+          if-no-files-found: warn
+
+      - name: Verify installed migration outcome
+        if: always()
+        env:
+          MIGRATION_OUTCOME: ${{ steps.installed_migration.outcome }}
+        run: |
+          if [ "$MIGRATION_OUTCOME" != "success" ]; then
+            echo "Installed APK migration outcome: $MIGRATION_OUTCOME"
+            if [ -f installed-apk-migration-report/result.txt ]; then
+              cat installed-apk-migration-report/result.txt
+            fi
+            exit 1
+          fi
+
+      - name: Upload physical-device APK bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: physical-device-apks
+          path: ${{ steps.physical_device_bundle.outputs.bundle_dir }}
+          if-no-files-found: error
+          retention-days: 14

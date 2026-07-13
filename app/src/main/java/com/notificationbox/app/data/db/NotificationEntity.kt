@@ -9,7 +9,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["postTimeMillis"]),
         Index(value = ["userPinned"]),
-        Index(value = ["isActive"])
+        Index(value = ["isActive"]),
+        Index(value = ["packageName"])
     ]
 )
 data class NotificationEntity(
@@ -24,6 +25,7 @@ data class NotificationEntity(
     val channelId: String?,
     val category: String,
     val reason: String,
+    val userDecision: String?,
     val userPinned: Boolean,
     val isActive: Boolean,
     val removedAtMillis: Long?
