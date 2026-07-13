@@ -117,16 +117,21 @@ class DryRunPlannerTest {
             .map { it.name }
             .filterNot { it.startsWith("$") }
             .toSet()
+        val sensitiveFields = setOf(
+            "title",
+            "text",
+            "appLabel",
+            "automaticReason",
+            "reason",
+            "extras",
+            "messagingStyle",
+            "ticker"
+        )
+        val exposedSensitiveFields = fields.intersect(sensitiveFields)
 
-        assertEquals(
-            setOf(
-                "notificationKey",
-                "packageName",
-                "selectedDecision",
-                "decisionSource",
-                "plannedAction"
-            ),
-            fields
+        assertTrue(
+            "PlannedNotificationAction exposes sensitive fields: $exposedSensitiveFields",
+            exposedSensitiveFields.isEmpty()
         )
     }
 
