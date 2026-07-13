@@ -20,7 +20,7 @@ jobs:
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     steps:
-      - name: Record exact-main workflow result
+      - name: Record exact-main workflow and combined result
         uses: actions/github-script@v8
         env:
           WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
@@ -30,14 +30,51 @@ jobs:
           RUN_URL: ${{ github.event.workflow_run.html_url }}
         with:
           script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
             const workflowName = process.env.WORKFLOW_NAME;
-            const issueNumbers = workflowName === 'Android CI Exact Ref' ? [5, 6] : [6];
-            const marker = `<!-- main-acceptance:${workflowName}:${process.env.HEAD_SHA} -->`;
-            const body = `${marker}
+            const headSha = process.env.HEAD_SHA;
+            const individualIssueNumbers =
+              workflowName === 'Android CI Exact Ref' ? [5, 6] : [6];
+
+            async function upsertComment(issueNumber, marker, body) {
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                {
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  per_page: 100,
+                }
+              );
+              const existing = comments.find(
+                comment => comment.body?.includes(marker)
+              );
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body,
+                });
+              }
+            }
+
+            const individualMarker =
+              `<!-- main-acceptance:${workflowName}:${headSha} -->`;
+            const individualBody = `${individualMarker}
             ## Automated exact-main acceptance record
 
             - Workflow: \`${workflowName}\`
-            - Exact main commit: \`${process.env.HEAD_SHA}\`
+            - Exact main commit: \`${headSha}\`
             - Run ID: \`${process.env.RUN_ID}\`
             - Conclusion: **${process.env.CONCLUSION}**
             - Event: \`push\`
@@ -46,28 +83,107 @@ jobs:
 
             This record is generated from a completed GitHub Actions \`workflow_run\`. It does not satisfy physical-device validation.`;
 
-            for (const issueNumber of issueNumbers) {
-              const comments = await github.paginate(github.rest.issues.listComments, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issueNumber,
-                per_page: 100,
-              });
-              const existing = comments.find(comment => comment.body?.includes(marker));
+            for (const issueNumber of individualIssueNumbers) {
+              await upsertComment(
+                issueNumber,
+                individualMarker,
+                individualBody
+              );
+            }
 
-              if (existing) {
-                await github.rest.issues.updateComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: existing.id,
-                  body,
-                });
-              } else {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  body,
-                });
+            const requiredWorkflows = [
+              'Android CI Exact Ref',
+              'Android Migration Emulator',
+            ];
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              {
+                owner,
+                repo,
+                event: 'push',
+                branch: 'main',
+                per_page: 100,
               }
+            );
+
+            const latestByWorkflow = new Map();
+            for (const run of runs) {
+              if (
+                run.head_sha !== headSha ||
+                !requiredWorkflows.includes(run.name)
+              ) {
+                continue;
+              }
+              const current = latestByWorkflow.get(run.name);
+              if (!current || run.run_attempt > current.run_attempt) {
+                latestByWorkflow.set(run.name, run);
+              }
+            }
+
+            const exactRun = latestByWorkflow.get('Android CI Exact Ref');
+            const migrationRun =
+              latestByWorkflow.get('Android Migration Emulator');
+
+            const resultOf = run => {
+              if (!run) return 'MISSING';
+              if (run.status !== 'completed') {
+                return run.status.toUpperCase();
+              }
+              return (run.conclusion || 'UNKNOWN').toUpperCase();
+            };
+
+            const exactResult = resultOf(exactRun);
+            const migrationResult = resultOf(migrationRun);
+            const failingResults = new Set([
+              'FAILURE',
+              'CANCELLED',
+              'TIMED_OUT',
+              'ACTION_REQUIRED',
+              'STARTUP_FAILURE',
+              'STALE',
+              'NEUTRAL',
+            ]);
+
+            let combinedResult = 'PENDING';
+            if (
+              exactResult === 'SUCCESS' &&
+              migrationResult === 'SUCCESS'
+            ) {
+              combinedResult = 'PASS';
+            } else if (
+              failingResults.has(exactResult) ||
+              failingResults.has(migrationResult)
+            ) {
+              combinedResult = 'FAIL';
+            }
+
+            const combinedMarker =
+              `<!-- combined-main-acceptance:${headSha} -->`;
+            const runLine = run =>
+              run
+                ? `run \`${run.id}\` — ${run.html_url}`
+                : 'run not found';
+            const combinedBody = `${combinedMarker}
+            ## Combined exact-main acceptance gate
+
+            - Exact main commit: \`${headSha}\`
+            - Android CI Exact Ref: **${exactResult}** — ${runLine(exactRun)}
+            - Android Migration Emulator: **${migrationResult}** — ${runLine(migrationRun)}
+            - Combined result: **${combinedResult}**
+
+            \`\`\`text
+            main_sha: ${headSha}
+            exact_ref_gate: ${exactResult}
+            migration_gate: ${migrationResult}
+            combined_main_gate: ${combinedResult}
+            \`\`\`
+
+            \`PASS\` requires both workflows to complete successfully for the same commit SHA. This gate does not satisfy physical-device validation.`;
+
+            for (const issueNumber of [5, 6]) {
+              await upsertComment(
+                issueNumber,
+                combinedMarker,
+                combinedBody
+              );
             }
