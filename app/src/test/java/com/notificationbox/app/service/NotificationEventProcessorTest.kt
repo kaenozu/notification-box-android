@@ -43,7 +43,7 @@ class NotificationEventProcessorTest {
 
         assertEquals(listOf("posted:key", "removed:key"), repository.calls)
         assertFalse(repository.records.getValue("key").isActive)
-        assertEquals(2_000, repository.records.getValue("key").removedAtMillis)
+        assertEquals(2_000L, repository.records.getValue("key").removedAtMillis)
     }
 
     @Test
@@ -187,11 +187,12 @@ class NotificationEventProcessorTest {
             synchronizedAtMillis: Long
         ) {
             calls += "sync"
-            records.replaceAll { key, record ->
-                if (record.isActive && key !in activeKeys) {
-                    record.copy(isActive = false, removedAtMillis = synchronizedAtMillis)
-                } else {
-                    record
+            records.entries.forEach { entry ->
+                val record = entry.value
+                if (record.isActive && entry.key !in activeKeys) {
+                    entry.setValue(
+                        record.copy(isActive = false, removedAtMillis = synchronizedAtMillis)
+                    )
                 }
             }
             notifications.forEach { records[it.key] = it }
