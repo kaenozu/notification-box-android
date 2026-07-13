@@ -21,8 +21,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify-linux:
