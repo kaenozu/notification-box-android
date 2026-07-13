@@ -133,6 +133,59 @@ jobs:
           "$V1_DIR/gradlew" -p "$V1_DIR" assembleDebug --no-daemon
           ./gradlew assembleDebug --no-daemon
 
+      - name: Prepare physical-device APK bundle
+        id: physical_device_bundle
+        run: |
+          set -euo pipefail
+          BUNDLE_DIR="$RUNNER_TEMP/physical-device-apks"
+          TESTED_SHA="$(git rev-parse HEAD)"
+          V1_SHORT="${V1_BASELINE:0:12}"
+          V2_SHORT="${TESTED_SHA:0:12}"
+
+          mkdir -p "$BUNDLE_DIR"
+          cp \
+            "$RUNNER_TEMP/notification-box-v1/app/build/outputs/apk/debug/app-debug.apk" \
+            "$BUNDLE_DIR/notification-box-v1-$V1_SHORT.apk"
+          cp \
+            "app/build/outputs/apk/debug/app-debug.apk" \
+            "$BUNDLE_DIR/notification-box-v2-$V2_SHORT.apk"
+          cp docs/pr4-device-validation.md "$BUNDLE_DIR/"
+
+          (
+            cd "$BUNDLE_DIR"
+            sha256sum ./*.apk > SHA256SUMS.txt
+          )
+
+          cat > "$BUNDLE_DIR/VALIDATION.txt" <<EOF
+          PR #4 physical-device validation bundle
+          v1 baseline: $V1_BASELINE
+          v2 tested HEAD: $TESTED_SHA
+
+          Fresh/current-version install:
+            adb devices -l
+            adb install -r notification-box-v2-$V2_SHORT.apk
+
+          Physical-device v1-to-v2 overwrite migration:
+            adb install -r notification-box-v1-$V1_SHORT.apk
+            Create notification history and pin at least one item in v1.
+            Do not uninstall or clear app storage.
+            adb install -r notification-box-v2-$V2_SHORT.apk
+
+          Complete every required check in pr4-device-validation.md and post only
+          the result table, exact HEAD, device details, and log marker match count.
+          Do not upload raw notification logs or notification screenshots.
+          EOF
+
+          echo "bundle_dir=$BUNDLE_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Upload physical-device APK bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: physical-device-apks
+          path: ${{ steps.physical_device_bundle.outputs.bundle_dir }}
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Verify installed APK overwrite migration
         id: installed_migration
         continue-on-error: true
