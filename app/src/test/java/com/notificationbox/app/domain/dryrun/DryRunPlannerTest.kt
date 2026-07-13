@@ -145,6 +145,35 @@ class DryRunPlannerTest {
         )
     }
 
+    @Test
+    fun candidateIdentifiersArePreviewScopedAndIndependentOfRawKeys() {
+        val firstRawKeys = listOf("first-raw-key", "second-raw-key")
+        val secondRawKeys = listOf("different-raw-key", "another-raw-key")
+
+        val firstPreview = planner.plan(
+            mode = OrganizationMode.DRY_RUN,
+            notifications = firstRawKeys.map(::notification)
+        )
+        val secondPreview = planner.plan(
+            mode = OrganizationMode.DRY_RUN,
+            notifications = secondRawKeys.map(::notification)
+        )
+
+        val expectedCandidateIds = listOf("candidate-1", "candidate-2")
+        assertEquals(
+            expectedCandidateIds,
+            firstPreview.plannedActions.map(PlannedNotificationAction::candidateId)
+        )
+        assertEquals(
+            expectedCandidateIds,
+            secondPreview.plannedActions.map(PlannedNotificationAction::candidateId)
+        )
+        (firstRawKeys + secondRawKeys).forEach { rawKey ->
+            assertFalse(firstPreview.toString().contains(rawKey))
+            assertFalse(secondPreview.toString().contains(rawKey))
+        }
+    }
+
     private fun notification(
         key: String,
         packageName: String = "com.example.$key",
