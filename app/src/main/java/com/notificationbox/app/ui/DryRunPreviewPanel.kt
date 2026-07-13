@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -24,6 +25,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.notificationbox.app.R
 import com.notificationbox.app.domain.dryrun.OrganizationMode
 import com.notificationbox.app.domain.dryrun.PlannedAction
+import com.notificationbox.app.domain.dryrun.toStatistics
+import com.notificationbox.app.model.DecisionSource
 
 @Composable
 fun Phase1NotificationBoxScreen(vm: NotificationBoxViewModel) {
@@ -50,6 +53,7 @@ private fun DryRunPreviewPanel(
     modifier: Modifier = Modifier
 ) {
     val preview = state.preview
+    val statistics = remember(preview) { preview.toStatistics() }
 
     Card(
         modifier = modifier,
@@ -87,6 +91,10 @@ private fun DryRunPreviewPanel(
                 )
             }
             if (state.mode == OrganizationMode.DRY_RUN) {
+                Text(
+                    text = stringResource(R.string.dry_run_planned_classification),
+                    style = MaterialTheme.typography.labelLarge
+                )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -128,6 +136,58 @@ private fun DryRunPreviewPanel(
                         }
                     )
                 }
+                Text(
+                    text = stringResource(
+                        R.string.dry_run_session_app_count,
+                        statistics.uniqueApplicationCount
+                    ),
+                    style = MaterialTheme.typography.labelLarge
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = {
+                            Text(
+                                stringResource(
+                                    R.string.dry_run_source_automatic,
+                                    statistics.countsByDecisionSource[DecisionSource.Automatic] ?: 0
+                                )
+                            )
+                        }
+                    )
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = {
+                            Text(
+                                stringResource(
+                                    R.string.dry_run_source_app_rule,
+                                    statistics.countsByDecisionSource[DecisionSource.AppRule] ?: 0
+                                )
+                            )
+                        }
+                    )
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = {
+                            Text(
+                                stringResource(
+                                    R.string.dry_run_source_manual,
+                                    statistics.countsByDecisionSource[DecisionSource.UserOverride] ?: 0
+                                )
+                            )
+                        }
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.dry_run_stats_ephemeral),
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
             Text(
                 text = stringResource(R.string.dry_run_no_os_operations),
