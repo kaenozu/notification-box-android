@@ -156,25 +156,25 @@ jobs:
             sha256sum ./*.apk > SHA256SUMS.txt
           )
 
-          cat > "$BUNDLE_DIR/VALIDATION.txt" <<EOF
-          PR #4 physical-device validation bundle
-          v1 baseline: $V1_BASELINE
-          v2 tested HEAD: $TESTED_SHA
-
-          Fresh/current-version install:
-            adb devices -l
-            adb install -r notification-box-v2-$V2_SHORT.apk
-
-          Physical-device v1-to-v2 overwrite migration:
-            adb install -r notification-box-v1-$V1_SHORT.apk
-            Create notification history and pin at least one item in v1.
-            Do not uninstall or clear app storage.
-            adb install -r notification-box-v2-$V2_SHORT.apk
-
-          Complete every required check in pr4-device-validation.md and post only
-          the result table, exact HEAD, device details, and log marker match count.
-          Do not upload raw notification logs or notification screenshots.
-          EOF
+          {
+            echo "PR #4 physical-device validation bundle"
+            echo "v1 baseline: $V1_BASELINE"
+            echo "v2 tested HEAD: $TESTED_SHA"
+            echo
+            echo "Fresh/current-version install:"
+            echo "  adb devices -l"
+            echo "  adb install -r notification-box-v2-$V2_SHORT.apk"
+            echo
+            echo "Physical-device v1-to-v2 overwrite migration:"
+            echo "  adb install -r notification-box-v1-$V1_SHORT.apk"
+            echo "  Create notification history and pin at least one item in v1."
+            echo "  Do not uninstall or clear app storage."
+            echo "  adb install -r notification-box-v2-$V2_SHORT.apk"
+            echo
+            echo "Complete every required check in pr4-device-validation.md and post only"
+            echo "the result table, exact HEAD, device details, and log marker match count."
+            echo "Do not upload raw notification logs or notification screenshots."
+          } > "$BUNDLE_DIR/VALIDATION.txt"
 
           echo "bundle_dir=$BUNDLE_DIR" >> "$GITHUB_OUTPUT"
 
