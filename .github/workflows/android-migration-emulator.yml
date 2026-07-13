@@ -160,6 +160,7 @@ jobs:
             echo "PR #4 physical-device validation bundle"
             echo "v1 baseline: $V1_BASELINE"
             echo "v2 tested HEAD: $TESTED_SHA"
+            echo "Use only after Android CI and both Android Migration Emulator jobs pass."
             echo
             echo "Fresh/current-version install:"
             echo "  adb devices -l"
@@ -177,14 +178,6 @@ jobs:
           } > "$BUNDLE_DIR/VALIDATION.txt"
 
           echo "bundle_dir=$BUNDLE_DIR" >> "$GITHUB_OUTPUT"
-
-      - name: Upload physical-device APK bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: physical-device-apks
-          path: ${{ steps.physical_device_bundle.outputs.bundle_dir }}
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Verify installed APK overwrite migration
         id: installed_migration
@@ -226,3 +219,11 @@ jobs:
             fi
             exit 1
           fi
+
+      - name: Upload physical-device APK bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: physical-device-apks
+          path: ${{ steps.physical_device_bundle.outputs.bundle_dir }}
+          if-no-files-found: error
+          retention-days: 14
