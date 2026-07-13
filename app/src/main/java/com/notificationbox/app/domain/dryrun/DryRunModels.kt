@@ -63,12 +63,13 @@ class DryRunPlanner {
         mode: OrganizationMode,
         notifications: List<NotificationItem>
     ): DryRunPreview {
-        val activeNotifications = notifications.filter(NotificationItem::isActive)
-
         if (mode == OrganizationMode.OBSERVE_ONLY) {
-            return DryRunPreview.observeOnly(activeNotifications.size)
+            return DryRunPreview.observeOnly(
+                activeNotificationCount = notifications.count(NotificationItem::isActive)
+            )
         }
 
+        val activeNotifications = notifications.filter(NotificationItem::isActive)
         val plannedActions = activeNotifications.map { notification ->
             PlannedNotificationAction(
                 notificationKey = notification.key,
@@ -78,13 +79,16 @@ class DryRunPlanner {
                 plannedAction = notification.category.toPlannedAction()
             )
         }
+        val observedCounts = plannedActions
+            .groupingBy(PlannedNotificationAction::plannedAction)
+            .eachCount()
 
         return DryRunPreview(
             mode = OrganizationMode.DRY_RUN,
             activeNotificationCount = activeNotifications.size,
             plannedActions = plannedActions,
             countsByAction = PlannedAction.entries.associateWith { action ->
-                plannedActions.count { it.plannedAction == action }
+                observedCounts[action] ?: 0
             }
         )
     }
