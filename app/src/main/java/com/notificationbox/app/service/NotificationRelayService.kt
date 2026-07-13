@@ -2,11 +2,11 @@ package com.notificationbox.app.service
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import com.notificationbox.app.App
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
 import java.time.Clock
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,8 +14,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class NotificationRelayService : NotificationListenerService() {
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val clock: Clock = Clock.systemUTC()
+    private var eventProcessor: NotificationEventProcessor? = null
 
     private val repository: NotificationRepository by lazy {
         (application as App).container.notificationRepository
@@ -40,50 +41,63 @@ class NotificationRelayService : NotificationListenerService() {
             .map(StatusBarNotification::getKey)
             .toSet()
         val records = currentNotifications.mapNotNull(::createRecordSafely)
-        val synchronizedAtMillis = clock.millis()
-        launchRepositoryOperation {
-            synchronizeActive(activeKeys, records, synchronizedAtMillis)
-        }
+        enqueue(
+            NotificationRepositoryEvent.SynchronizeActive(
+                activeKeys = activeKeys,
+                notifications = records,
+                synchronizedAtMillis = clock.millis()
+            )
+        )
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        persistPosted(sbn)
+        val record = createRecordSafely(sbn) ?: return
+        enqueue(NotificationRepositoryEvent.Posted(record))
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-        val removedAtMillis = clock.millis()
-        launchRepositoryOperation {
-            markRemoved(sbn.key, removedAtMillis)
-        }
+        enqueue(
+            NotificationRepositoryEvent.Removed(
+                key = sbn.key,
+                removedAtMillis = clock.millis()
+            )
+        )
     }
 
     override fun onDestroy() {
-        serviceScope.cancel()
-        super.onDestroy()
-    }
-
-    private fun persistPosted(sbn: StatusBarNotification) {
-        val record = createRecordSafely(sbn) ?: return
-        launchRepositoryOperation {
-            upsert(record)
+        val processor = eventProcessor
+        if (processor == null) {
+            serviceScope.cancel()
+        } else {
+            processor.close()
+            serviceScope.launch {
+                processor.join()
+                serviceScope.cancel()
+            }
         }
+        super.onDestroy()
     }
 
     private fun createRecordSafely(sbn: StatusBarNotification): NotificationRecord? =
         runCatching { recordFactory.create(sbn) }.getOrNull()
 
-    private fun launchRepositoryOperation(
-        operation: suspend NotificationRepository.() -> Unit
-    ) {
-        serviceScope.launch {
-            try {
-                repository.operation()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                // Notification contents are deliberately not logged.
-            }
+    private fun enqueue(event: NotificationRepositoryEvent) {
+        if (!processor().enqueue(event)) {
+            Log.w(TAG, "Notification event rejected after shutdown: ${event.type}")
         }
+    }
+
+    private fun processor(): NotificationEventProcessor =
+        eventProcessor ?: NotificationEventProcessor(
+            repository = repository,
+            scope = serviceScope,
+            failureReporter = NotificationEventFailureReporter { eventType ->
+                Log.e(TAG, "Notification repository event failed: $eventType")
+            }
+        ).also { eventProcessor = it }
+
+    private companion object {
+        const val TAG = "NotificationRelay"
     }
 }
