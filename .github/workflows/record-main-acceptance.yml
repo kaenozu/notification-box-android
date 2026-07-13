@@ -25,6 +25,7 @@ jobs:
         env:
           WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
@@ -106,6 +107,18 @@ jobs:
               }
             );
 
+            // Include the triggering run explicitly so API indexing delay cannot
+            // leave the final same-SHA record permanently in PENDING state.
+            runs.push({
+              id: Number(process.env.RUN_ID),
+              run_attempt: Number(process.env.RUN_ATTEMPT || 1),
+              name: workflowName,
+              head_sha: headSha,
+              status: 'completed',
+              conclusion: process.env.CONCLUSION,
+              html_url: process.env.RUN_URL,
+            });
+
             const latestByWorkflow = new Map();
             for (const run of runs) {
               if (
@@ -115,7 +128,13 @@ jobs:
                 continue;
               }
               const current = latestByWorkflow.get(run.name);
-              if (!current || run.run_attempt > current.run_attempt) {
+              const runAttempt = run.run_attempt || 1;
+              const currentAttempt = current?.run_attempt || 1;
+              if (
+                !current ||
+                runAttempt > currentAttempt ||
+                (runAttempt === currentAttempt && run.id > current.id)
+              ) {
                 latestByWorkflow.set(run.name, run);
               }
             }
