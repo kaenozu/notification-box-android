@@ -4,23 +4,10 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - ".github/scripts/verify-installed-apk-migration.sh"
-      - ".github/workflows/android-migration-emulator.yml"
-      - "app/build.gradle.kts"
-      - "app/schemas/**"
-      - "app/src/androidTest/**"
-      - "app/src/main/java/com/notificationbox/app/data/db/**"
   push:
     branches:
       - main
-    paths:
-      - ".github/scripts/verify-installed-apk-migration.sh"
-      - ".github/workflows/android-migration-emulator.yml"
-      - "app/build.gradle.kts"
-      - "app/schemas/**"
-      - "app/src/androidTest/**"
-      - "app/src/main/java/com/notificationbox/app/data/db/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,7 +17,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-migration-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.detect.outputs.required }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect migration-relevant changes
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          printf '%s\n' "$changed_files"
+
+          if printf '%s\n' "$changed_files" | grep -Eq \
+            '^(\.github/scripts/verify-installed-apk-migration\.sh|\.github/workflows/android-migration-emulator\.yml|app/build\.gradle\.kts|app/schemas/|app/src/androidTest/|app/src/main/java/com/notificationbox/app/data/db/)'; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify-room-migration:
+    needs: detect-migration-changes
+    if: needs.detect-migration-changes.outputs.required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -97,6 +120,8 @@ jobs:
           fi
 
   verify-installed-apk-migration:
+    needs: detect-migration-changes
+    if: needs.detect-migration-changes.outputs.required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -157,10 +182,10 @@ jobs:
           )
 
           {
-            echo "PR #4 physical-device validation bundle"
+            echo "Physical-device validation bundle"
             echo "v1 baseline: $V1_BASELINE"
             echo "v2 tested HEAD: $TESTED_SHA"
-            echo "Use only after Android CI and both Android Migration Emulator jobs pass."
+            echo "Use only after Android CI and Android Migration Emulator pass for the same HEAD."
             echo
             echo "Fresh/current-version install:"
             echo "  adb devices -l"
@@ -227,3 +252,38 @@ jobs:
           path: ${{ steps.physical_device_bundle.outputs.bundle_dir }}
           if-no-files-found: error
           retention-days: 14
+
+  migration-gate:
+    if: always()
+    needs:
+      - detect-migration-changes
+      - verify-room-migration
+      - verify-installed-apk-migration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify migration gate
+        env:
+          REQUIRED: ${{ needs.detect-migration-changes.outputs.required }}
+          DETECT_RESULT: ${{ needs.detect-migration-changes.result }}
+          ROOM_RESULT: ${{ needs.verify-room-migration.result }}
+          INSTALLED_RESULT: ${{ needs.verify-installed-apk-migration.result }}
+        run: |
+          set -euo pipefail
+
+          if [ "$DETECT_RESULT" != "success" ]; then
+            echo "Migration change detection failed: $DETECT_RESULT"
+            exit 1
+          fi
+
+          if [ "$REQUIRED" != "true" ]; then
+            echo "No migration-relevant changes; gate passes."
+            exit 0
+          fi
+
+          if [ "$ROOM_RESULT" != "success" ] || [ "$INSTALLED_RESULT" != "success" ]; then
+            echo "Room migration result: $ROOM_RESULT"
+            echo "Installed APK migration result: $INSTALLED_RESULT"
+            exit 1
+          fi
+
+          echo "All migration validations passed."
