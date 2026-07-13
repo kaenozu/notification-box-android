@@ -1,6 +1,9 @@
-name: Android CI Manual
+name: Android CI Exact Ref
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       ref:
@@ -13,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -23,7 +26,7 @@ jobs:
       - name: Checkout requested revision
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
           fetch-depth: 0
 
       - name: Record tested revision
@@ -51,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-ci-manual-linux
+          name: android-ci-exact-ref-linux
           path: |
             tested-sha.txt
             app/build/reports/tests/testDebugUnitTest
@@ -68,7 +71,7 @@ jobs:
       - name: Checkout requested revision
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
           fetch-depth: 0
 
       - name: Record tested revision
@@ -138,7 +141,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-ci-manual-windows
+          name: android-ci-exact-ref-windows
           path: |
             tested-sha.txt
             dependency-insight-windows.log
@@ -150,14 +153,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  manual-ci-gate:
+  exact-ref-ci-gate:
     if: always()
     needs:
       - verify-linux
       - verify-windows
     runs-on: ubuntu-latest
     steps:
-      - name: Verify manual CI gate
+      - name: Verify exact-ref CI gate
         env:
           LINUX_RESULT: ${{ needs.verify-linux.result }}
           WINDOWS_RESULT: ${{ needs.verify-windows.result }}
