@@ -1,6 +1,11 @@
 name: Android CI Exact Ref
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/android-ci-manual.yml"
   push:
     branches:
       - main
@@ -16,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -26,7 +31,7 @@ jobs:
       - name: Checkout requested revision
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Record tested revision
@@ -71,7 +76,7 @@ jobs:
       - name: Checkout requested revision
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Record tested revision
