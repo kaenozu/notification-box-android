@@ -10,6 +10,6 @@ fun NotificationBoxApp(
     vm: NotificationBoxViewModel = viewModel(factory = factory)
 ) {
     MaterialTheme {
-        NotificationBoxScreen(vm)
+        Phase1NotificationBoxScreen(vm)
     }
 }
