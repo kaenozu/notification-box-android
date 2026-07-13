@@ -1,0 +1,73 @@
+name: Record Main Acceptance
+
+on:
+  workflow_run:
+    workflows:
+      - Android CI Exact Ref
+      - Android Migration Emulator
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  record:
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record exact-main workflow result
+        uses: actions/github-script@v8
+        env:
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        with:
+          script: |
+            const workflowName = process.env.WORKFLOW_NAME;
+            const issueNumbers = workflowName === 'Android CI Exact Ref' ? [5, 6] : [6];
+            const marker = `<!-- main-acceptance:${workflowName}:${process.env.HEAD_SHA} -->`;
+            const body = `${marker}
+            ## Automated exact-main acceptance record
+
+            - Workflow: \`${workflowName}\`
+            - Exact main commit: \`${process.env.HEAD_SHA}\`
+            - Run ID: \`${process.env.RUN_ID}\`
+            - Conclusion: **${process.env.CONCLUSION}**
+            - Event: \`push\`
+            - Branch: \`main\`
+            - Run: ${process.env.RUN_URL}
+
+            This record is generated from a completed GitHub Actions \`workflow_run\`. It does not satisfy physical-device validation.`;
+
+            for (const issueNumber of issueNumbers) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              });
+              const existing = comments.find(comment => comment.body?.includes(marker));
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body,
+                });
+              }
+            }
