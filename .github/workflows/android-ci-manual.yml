@@ -48,6 +48,7 @@ jobs:
 
       - name: Run Linux validation
         run: |
+          git config core.fileMode false
           chmod +x gradlew
           ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
           git diff --check
