@@ -27,10 +27,11 @@ enum class PlannedAction {
 /**
  * Minimal, non-content representation of what dry-run would do inside the application.
  *
- * Notification title, text, application label, extras, and style payloads are deliberately absent.
+ * [candidateId] is scoped to one generated preview and cannot be used as an Android notification key.
+ * Notification keys, title, text, application label, extras, and style payloads are deliberately absent.
  */
 data class PlannedNotificationAction(
-    val notificationKey: String,
+    val candidateId: String,
     val packageName: String,
     val selectedDecision: NotificationDecision,
     val decisionSource: DecisionSource,
@@ -70,9 +71,9 @@ class DryRunPlanner {
         }
 
         val activeNotifications = notifications.filter(NotificationItem::isActive)
-        val plannedActions = activeNotifications.map { notification ->
+        val plannedActions = activeNotifications.mapIndexed { index, notification ->
             PlannedNotificationAction(
-                notificationKey = notification.key,
+                candidateId = "candidate-${index + 1}",
                 packageName = notification.packageName,
                 selectedDecision = notification.category,
                 decisionSource = notification.decisionSource,
