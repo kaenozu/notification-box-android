@@ -42,6 +42,9 @@ class NotificationBoxViewModel(
 
     private val permissionState = MutableStateFlow(readPermissionState())
     private val organizationMode = MutableStateFlow(OrganizationMode.OBSERVE_ONLY)
+
+    // Share one repository snapshot so permission, rule-list, and statistics changes do not
+    // cause duplicate repository collection or unnecessary dry-run planning.
     private val notifications: StateFlow<List<NotificationItem>> =
         notificationRepository.observeNotifications().stateIn(
             viewModelScope,
