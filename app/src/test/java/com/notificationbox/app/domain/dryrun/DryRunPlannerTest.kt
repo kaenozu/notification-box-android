@@ -65,21 +65,21 @@ class DryRunPlannerTest {
         assertEquals(
             listOf(
                 PlannedNotificationAction(
-                    notificationKey = "manual",
+                    candidateId = "candidate-1",
                     packageName = "com.example.manual",
                     selectedDecision = NotificationDecision.KeepNow,
                     decisionSource = DecisionSource.UserOverride,
                     plannedAction = PlannedAction.KEEP_IN_CURRENT_VIEW
                 ),
                 PlannedNotificationAction(
-                    notificationKey = "rule",
+                    candidateId = "candidate-2",
                     packageName = "com.example.rule",
                     selectedDecision = NotificationDecision.HoldForDigest,
                     decisionSource = DecisionSource.AppRule,
                     plannedAction = PlannedAction.ADD_TO_DIGEST_PREVIEW
                 ),
                 PlannedNotificationAction(
-                    notificationKey = "automatic",
+                    candidateId = "candidate-3",
                     packageName = "com.example.automatic",
                     selectedDecision = NotificationDecision.Ignore,
                     decisionSource = DecisionSource.Automatic,
@@ -91,18 +91,23 @@ class DryRunPlannerTest {
         assertEquals(1, preview.countsByAction[PlannedAction.KEEP_IN_CURRENT_VIEW])
         assertEquals(1, preview.countsByAction[PlannedAction.ADD_TO_DIGEST_PREVIEW])
         assertEquals(1, preview.countsByAction[PlannedAction.EXCLUDE_FROM_DIGEST_PREVIEW])
-        assertFalse(preview.plannedActions.any { it.notificationKey == "inactive" })
+        assertEquals(
+            listOf("candidate-1", "candidate-2", "candidate-3"),
+            preview.plannedActions.map(PlannedNotificationAction::candidateId)
+        )
     }
 
     @Test
-    fun plannedActionsDoNotExposeNotificationContent() {
+    fun plannedActionsDoNotExposeNotificationContentOrRawKey() {
         val title = "private-title-sentinel"
         val text = "private-body-sentinel"
+        val rawKey = "raw-notification-key-sentinel"
         val preview = planner.plan(
             mode = OrganizationMode.DRY_RUN,
             notifications = listOf(
                 notification(
-                    key = "content-check",
+                    key = rawKey,
+                    packageName = "com.example.private",
                     title = title,
                     text = text
                 )
@@ -112,12 +117,17 @@ class DryRunPlannerTest {
         val rendered = preview.toString()
         assertFalse(rendered.contains(title))
         assertFalse(rendered.contains(text))
+        assertFalse(rendered.contains(rawKey))
 
         val fields = PlannedNotificationAction::class.java.declaredFields
             .map { it.name }
             .filterNot { it.startsWith("$") }
             .toSet()
         val sensitiveFields = setOf(
+            "key",
+            "notificationKey",
+            "rawKey",
+            "osKey",
             "title",
             "text",
             "appLabel",
@@ -137,6 +147,7 @@ class DryRunPlannerTest {
 
     private fun notification(
         key: String,
+        packageName: String = "com.example.$key",
         decision: NotificationDecision = NotificationDecision.KeepNow,
         source: DecisionSource = DecisionSource.Automatic,
         isActive: Boolean = true,
@@ -145,8 +156,8 @@ class DryRunPlannerTest {
     ): NotificationItem =
         NotificationItem(
             key = key,
-            packageName = "com.example.$key",
-            appLabel = "Example $key",
+            packageName = packageName,
+            appLabel = "Example",
             title = title,
             text = text,
             postTime = Instant.ofEpochMilli(1_000),
