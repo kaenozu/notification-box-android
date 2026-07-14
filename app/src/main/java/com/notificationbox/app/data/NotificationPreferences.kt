@@ -24,6 +24,7 @@ object NotificationPreferences {
 
     private val modeKey = stringPreferencesKey("mode")
     private val pausedTextKey = stringPreferencesKey("paused_text")
+    private val digestHourCountKey = intPreferencesKey("digest_hour_count")
     private val digestHourKeys = listOf(
         intPreferencesKey("digest_hour_1"),
         intPreferencesKey("digest_hour_2"),
@@ -42,13 +43,19 @@ object NotificationPreferences {
             val mode = prefs[modeKey]
                 ?.let { stored -> runCatching { AppMode.valueOf(stored) }.getOrNull() }
                 ?: AppMode.Observation
+            val defaultHours = DigestSchedule().hours
+            // Existing installations have no count key and historically persisted four slots.
+            val storedCount = prefs[digestHourCountKey]
+                ?.coerceIn(1, digestHourKeys.size)
+                ?: digestHourKeys.size
             val digestHours = digestHourKeys
+                .take(storedCount)
                 .mapIndexed { index, key ->
-                    prefs[key] ?: DigestSchedule().hours[index]
+                    prefs[key] ?: defaultHours.getOrElse(index) { defaultHours.last() }
                 }
                 .filter { it in 0..23 }
                 .distinct()
-                .ifEmpty { DigestSchedule().hours }
+                .ifEmpty { defaultHours }
 
             NotificationPreferenceState(
                 mode = mode,
@@ -72,15 +79,18 @@ object NotificationPreferences {
     }
 
     suspend fun saveDigestHours(hours: List<Int>) {
+        val defaults = DigestSchedule().hours
         val normalized = hours
             .filter { it in 0..23 }
             .distinct()
             .take(digestHourKeys.size)
-        val defaults = DigestSchedule().hours
+            .ifEmpty { defaults }
 
         requireContext().notificationPrefsDataStore.edit { prefs ->
+            prefs[digestHourCountKey] = normalized.size
             digestHourKeys.forEachIndexed { index, key ->
-                prefs[key] = normalized.getOrNull(index) ?: defaults[index]
+                prefs[key] = normalized.getOrNull(index)
+                    ?: defaults.getOrElse(index) { defaults.last() }
             }
         }
     }
