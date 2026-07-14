@@ -78,6 +78,24 @@ class NotificationMappingTest {
     }
 
     @Test
+    fun `messaging style falls back to latest sender when conversation title is absent`() {
+        val self = Person.Builder().setName("Me").build()
+        val sender = Person.Builder().setName("Alice").build()
+        val notification = Notification.Builder(context, "channel")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setStyle(
+                Notification.MessagingStyle(self)
+                    .addMessage("latest", 2L, sender)
+            )
+            .build()
+
+        val extracted = NotificationTextExtractor.extract(notification)
+
+        assertEquals("Alice", extracted.title)
+        assertEquals("latest", extracted.text)
+    }
+
+    @Test
     fun `regular text is used when big and messaging text are absent`() {
         val notification = Notification().apply {
             extras.putCharSequence(Notification.EXTRA_TEXT, "regular text")
