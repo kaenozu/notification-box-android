@@ -32,15 +32,18 @@ jobs:
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
       - name: Make Gradle executable
-        run: chmod +x gradlew
+        run: |
+          git config core.fileMode false
+          chmod +x gradlew
 
       - name: Verify immutable action references
         id: action_pins
         run: |
           set +e
-          python3 .github/scripts/verify-action-pins.py > action-pins.log 2>&1
+          log="$RUNNER_TEMP/action-pins.log"
+          python3 .github/scripts/verify-action-pins.py > "$log" 2>&1
           exit_code=$?
-          cat action-pins.log
+          cat "$log"
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -48,9 +51,10 @@ jobs:
         id: unit_tests
         run: |
           set +e
-          ./gradlew testDebugUnitTest --no-daemon > unit-tests.log 2>&1
+          log="$RUNNER_TEMP/unit-tests.log"
+          ./gradlew testDebugUnitTest --no-daemon > "$log" 2>&1
           exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then cat unit-tests.log; fi
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -58,9 +62,10 @@ jobs:
         id: lint
         run: |
           set +e
-          ./gradlew lintDebug --no-daemon > lint.log 2>&1
+          log="$RUNNER_TEMP/lint.log"
+          ./gradlew lintDebug --no-daemon > "$log" 2>&1
           exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then cat lint.log; fi
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -68,9 +73,10 @@ jobs:
         id: assemble
         run: |
           set +e
-          ./gradlew assembleDebug --no-daemon > assemble.log 2>&1
+          log="$RUNNER_TEMP/assemble.log"
+          ./gradlew assembleDebug --no-daemon > "$log" 2>&1
           exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then cat assemble.log; fi
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -78,21 +84,22 @@ jobs:
         id: repository
         run: |
           set +e
-          : > repository.log
+          log="$RUNNER_TEMP/repository.log"
+          : > "$log"
           failed=0
-          git diff --check >> repository.log 2>&1 || failed=1
-          git diff --exit-code -- app/schemas >> repository.log 2>&1 || failed=1
+          git diff --check >> "$log" 2>&1 || failed=1
+          git diff --exit-code -- app/schemas >> "$log" 2>&1 || failed=1
           untracked="$(git ls-files --others --exclude-standard app/schemas)"
           if [ -n "$untracked" ]; then
-            printf '%s\n' "$untracked" >> repository.log
+            printf '%s\n' "$untracked" >> "$log"
             failed=1
           fi
           working_tree="$(git status --porcelain --untracked-files=all)"
           if [ -n "$working_tree" ]; then
-            printf '%s\n' "$working_tree" >> repository.log
+            printf '%s\n' "$working_tree" >> "$log"
             failed=1
           fi
-          if [ "$failed" -ne 0 ]; then cat repository.log; fi
+          if [ "$failed" -ne 0 ]; then cat "$log"; fi
           echo "exit_code=$failed" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -102,11 +109,11 @@ jobs:
         with:
           name: android-ci-diagnostics
           path: |
-            action-pins.log
-            unit-tests.log
-            lint.log
-            assemble.log
-            repository.log
+            ${{ runner.temp }}/action-pins.log
+            ${{ runner.temp }}/unit-tests.log
+            ${{ runner.temp }}/lint.log
+            ${{ runner.temp }}/assemble.log
+            ${{ runner.temp }}/repository.log
             app/build/reports/tests/testDebugUnitTest
             app/build/test-results/testDebugUnitTest
             app/build/reports/lint-results-debug.html
