@@ -5,19 +5,28 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +62,7 @@ fun Phase1NotificationBoxScreen(vm: NotificationBoxViewModel) {
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .onSizeChanged { panelHeightPx = it.height }
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp)
         )
     }
 }
@@ -67,34 +76,54 @@ private fun DryRunPreviewPanel(
 ) {
     val preview = state.preview
     val statistics = remember(preview) { preview.toStatistics() }
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = stringResource(R.string.dry_run_preview_title),
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = stringResource(
-                    R.string.dry_run_preview_active_count,
-                    preview.activeNotificationCount
-                )
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.dry_run_preview_title),
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.dry_run_preview_active_count_short,
+                            preview.activeNotificationCount
+                        ),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (state.mode == OrganizationMode.DRY_RUN) {
+                    IconButton(onClick = { expanded = !expanded }) {
+                        Icon(
+                            if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = if (expanded) "試算の詳細を閉じる" else "試算の詳細を表示"
+                        )
+                    }
+                }
+            }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 FilterChip(
                     selected = state.mode == OrganizationMode.OBSERVE_ONLY,
-                    onClick = { onModeSelected(OrganizationMode.OBSERVE_ONLY) },
+                    onClick = {
+                        expanded = false
+                        onModeSelected(OrganizationMode.OBSERVE_ONLY)
+                    },
                     label = { Text(stringResource(R.string.dry_run_mode_observe)) }
                 )
                 FilterChip(
@@ -103,14 +132,14 @@ private fun DryRunPreviewPanel(
                     label = { Text(stringResource(R.string.dry_run_mode_plan)) }
                 )
             }
-            if (state.mode == OrganizationMode.DRY_RUN) {
+            if (state.mode == OrganizationMode.DRY_RUN && expanded) {
                 Text(
                     text = stringResource(R.string.dry_run_planned_classification),
                     style = MaterialTheme.typography.labelLarge
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     InformationalChip(
                         text = stringResource(
@@ -140,7 +169,7 @@ private fun DryRunPreviewPanel(
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     InformationalChip(
                         text = stringResource(
@@ -167,7 +196,7 @@ private fun DryRunPreviewPanel(
                 )
             }
             Text(
-                text = stringResource(R.string.dry_run_no_os_operations),
+                text = stringResource(R.string.dry_run_no_os_operations_short),
                 style = MaterialTheme.typography.bodySmall
             )
         }
