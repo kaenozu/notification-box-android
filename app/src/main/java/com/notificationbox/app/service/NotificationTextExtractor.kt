@@ -12,9 +12,11 @@ object NotificationTextExtractor {
         val extras = notification.extras
         val messaging = extractMessagingStyle(notification)
 
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+        // MessagingStyle can synthesize EXTRA_TITLE as "conversation: sender". Prefer the
+        // structured conversation title (or latest sender) when structured messages exist.
+        val title = messaging?.title
+            ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString()
-            ?: messaging?.title
 
         val text = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
             ?: messaging?.text
