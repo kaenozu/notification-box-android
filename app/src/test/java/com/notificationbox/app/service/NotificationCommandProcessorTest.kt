@@ -8,13 +8,17 @@ import com.notificationbox.app.model.IngestionErrorCode
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationIngestionHealth
 import com.notificationbox.app.model.NotificationItem
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -41,6 +45,7 @@ class NotificationCommandProcessorTest {
         assertEquals(3L, health.health.value.processedCommands)
         assertEquals(0L, health.health.value.failedCommands)
         queue.close()
+        queue.join()
     }
 
     @Test
@@ -62,6 +67,40 @@ class NotificationCommandProcessorTest {
         assertEquals(1L, health.health.value.failedCommands)
         assertEquals(IngestionErrorCode.REPOSITORY_OPERATION_FAILED, health.health.value.lastError)
         queue.close()
+        queue.join()
+    }
+
+    @Test
+    fun `close drains accepted command and rejects later submission`() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val repository = RecordingRepository(
+            beforeUpsert = {
+                started.complete(Unit)
+                release.await()
+            }
+        )
+        val health = RecordingHealthReporter()
+        val queue = NotificationCommandQueue(
+            scope = backgroundScope,
+            processor = NotificationCommandProcessor(repository, health),
+            healthReporter = health
+        )
+
+        assertTrue(queue.submit(NotificationCommand.Upsert(record("accepted"))))
+        runCurrent()
+        started.await()
+
+        queue.close()
+        assertFalse(queue.submit(NotificationCommand.Upsert(record("late"))))
+        release.complete(Unit)
+        advanceUntilIdle()
+        queue.join()
+
+        assertEquals(listOf("upsert:accepted:1000"), repository.operations)
+        assertEquals(1L, health.health.value.processedCommands)
+        assertEquals(1L, health.health.value.failedCommands)
+        assertEquals(IngestionErrorCode.COMMAND_QUEUE_CLOSED, health.health.value.lastError)
     }
 
     private fun record(key: String, postTimeMillis: Long = 1_000L) =
@@ -98,7 +137,8 @@ class NotificationCommandProcessorTest {
     }
 
     private class RecordingRepository(
-        private val failFirstUpsert: Boolean = false
+        private val failFirstUpsert: Boolean = false,
+        private val beforeUpsert: suspend () -> Unit = {}
     ) : NotificationRepository {
         val operations = mutableListOf<String>()
         private var failed = false
@@ -113,6 +153,7 @@ class NotificationCommandProcessorTest {
             MutableStateFlow(ClassificationStats())
 
         override suspend fun upsert(notification: NotificationRecord) {
+            beforeUpsert()
             operations += "upsert:${notification.key}:${notification.postTimeMillis}"
             if (failFirstUpsert && !failed) {
                 failed = true
