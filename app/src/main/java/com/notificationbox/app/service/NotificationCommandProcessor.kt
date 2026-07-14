@@ -5,6 +5,7 @@ import com.notificationbox.app.data.repository.NotificationRepository
 import com.notificationbox.app.model.IngestionErrorCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
@@ -59,22 +60,26 @@ internal class NotificationCommandQueue(
     private val healthReporter: NotificationIngestionHealthReporter
 ) {
     private val commands = Channel<NotificationCommand>(capacity = Channel.UNLIMITED)
-
-    init {
-        scope.launch {
-            for (command in commands) {
-                processor.process(command)
-            }
+    private val consumerJob: Job = scope.launch {
+        for (command in commands) {
+            processor.process(command)
         }
     }
 
-    fun submit(command: NotificationCommand) {
-        if (commands.trySend(command).isFailure) {
+    fun submit(command: NotificationCommand): Boolean {
+        val accepted = commands.trySend(command).isSuccess
+        if (!accepted) {
             healthReporter.recordFailure(IngestionErrorCode.COMMAND_QUEUE_CLOSED)
         }
+        return accepted
     }
 
+    /** Stops new submissions while allowing all already-accepted commands to drain. */
     fun close() {
         commands.close()
+    }
+
+    suspend fun join() {
+        consumerJob.join()
     }
 }
