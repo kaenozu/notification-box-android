@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class NotificationRelayService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -80,8 +81,13 @@ class NotificationRelayService : NotificationListenerService() {
     override fun onDestroy() {
         if (::commandQueue.isInitialized) {
             commandQueue.close()
+            serviceScope.launch {
+                commandQueue.join()
+                serviceScope.cancel()
+            }
+        } else {
+            serviceScope.cancel()
         }
-        serviceScope.cancel()
         super.onDestroy()
     }
 
