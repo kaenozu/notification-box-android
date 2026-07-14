@@ -65,8 +65,10 @@ import com.notificationbox.app.model.AppMode
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.DecisionSource
+import com.notificationbox.app.model.IngestionErrorCode
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -81,6 +83,7 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     val context = LocalContext.current
     val state by vm.state.collectAsStateWithLifecycle()
     var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
+    var showStatsResetConfirmation by rememberSaveable { mutableStateOf(false) }
     var selectedSectionIndex by rememberSaveable { mutableIntStateOf(0) }
     var appRuleTarget by remember { mutableStateOf<NotificationItem?>(null) }
     val selectedSection = HomeSection.entries[selectedSectionIndex]
@@ -111,17 +114,42 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
             title = { Text("通知履歴を全て削除しますか？") },
-            text = { Text("ピン留めを含む端末内の履歴が削除されます。アプリ別ルールは残ります。") },
+            text = { Text("ピン留めを含む端末内の履歴が削除されます。アプリ別ルールと分類統計は残ります。") },
             confirmButton = {
-                TextButton(onClick = {
-                    showClearConfirmation = false
-                    vm.clearAll()
-                }) {
+                TextButton(
+                    onClick = {
+                        showClearConfirmation = false
+                        vm.clearAll()
+                    }
+                ) {
                     Text("削除")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirmation = false }) {
+                    Text("キャンセル")
+                }
+            }
+        )
+    }
+
+    if (showStatsResetConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showStatsResetConfirmation = false },
+            title = { Text("分類統計をリセットしますか？") },
+            text = { Text("分類件数と補正操作の集計だけを削除します。通知履歴とアプリ別ルールは残ります。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showStatsResetConfirmation = false
+                        vm.resetClassificationStats()
+                    }
+                ) {
+                    Text("リセット")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStatsResetConfirmation = false }) {
                     Text("キャンセル")
                 }
             }
@@ -150,13 +178,32 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("観察から始めて、自分に合うルールを作ります", style = MaterialTheme.typography.titleMedium)
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            "観察から始めて、自分に合うルールを作ります",
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         Text(
                             "状態: ${state.mode.displayName()} / " +
-                                "通知アクセス: ${if (state.notificationAccessGranted) "許可済み" else "未許可"} / " +
-                                "通知送信: ${if (state.postNotificationsGranted) "許可済み" else "未許可"}"
+                                "通知アクセス: ${state.notificationAccessGranted.statusText()} / " +
+                                "送信権限: ${state.postNotificationsRuntimeGranted.statusText()} / " +
+                                "通知設定: ${state.appNotificationsEnabled.statusText()}"
+                        )
+                        Text(
+                            ingestionHealthText(
+                                processed = state.ingestionHealth.processedCommands,
+                                failed = state.ingestionHealth.failedCommands,
+                                lastError = state.ingestionHealth.lastError
+                            ),
+                            style = MaterialTheme.typography.bodySmall
                         )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -165,14 +212,30 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                             Button(onClick = { context.startActivity(openListenerSettings) }) {
                                 Text("通知アクセス")
                             }
-                            Button(onClick = {
-                                if (Build.VERSION.SDK_INT >= 33 && !state.postNotificationsGranted) {
-                                    postNotificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    context.startActivity(openAppNotificationSettings)
+                            Button(
+                                onClick = {
+                                    val needsRuntimePermission =
+                                        Build.VERSION.SDK_INT >= 33 &&
+                                            !state.postNotificationsRuntimeGranted
+                                    if (needsRuntimePermission) {
+                                        postNotificationLauncher.launch(
+                                            Manifest.permission.POST_NOTIFICATIONS
+                                        )
+                                    } else {
+                                        context.startActivity(openAppNotificationSettings)
+                                    }
                                 }
-                            }) {
-                                Text("通知許可")
+                            ) {
+                                val label =
+                                    if (
+                                        Build.VERSION.SDK_INT >= 33 &&
+                                        !state.postNotificationsRuntimeGranted
+                                    ) {
+                                        "送信権限を許可"
+                                    } else {
+                                        "通知設定"
+                                    }
+                                Text(label)
                             }
                             if (BuildConfig.DEBUG) {
                                 Button(onClick = vm::seed) { Text("デモ追加") }
@@ -195,12 +258,16 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                 ) {
                     FilterChip(
                         selected = selectedSection == HomeSection.Notifications,
-                        onClick = { selectedSectionIndex = HomeSection.Notifications.ordinal },
+                        onClick = {
+                            selectedSectionIndex = HomeSection.Notifications.ordinal
+                        },
                         label = { Text("通知履歴") }
                     )
                     FilterChip(
                         selected = selectedSection == HomeSection.AppRules,
-                        onClick = { selectedSectionIndex = HomeSection.AppRules.ordinal },
+                        onClick = {
+                            selectedSectionIndex = HomeSection.AppRules.ordinal
+                        },
                         label = { Text("アプリ別ルール (${state.appRules.size})") }
                     )
                 }
@@ -217,19 +284,31 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                                 AssistChip(
                                     onClick = { vm.setMode(AppMode.Observation) },
                                     label = { Text("観察") },
-                                    leadingIcon = { Icon(Icons.Filled.Notifications, "観察モード") }
+                                    leadingIcon = {
+                                        Icon(Icons.Filled.Notifications, "観察モード")
+                                    }
                                 )
                                 AssistChip(
                                     onClick = {},
                                     enabled = false,
                                     label = { Text("整理（準備中）") },
-                                    leadingIcon = { Icon(Icons.Filled.Security, "整理モードは準備中") }
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.Security,
+                                            "整理モードは準備中"
+                                        )
+                                    }
                                 )
                                 AssistChip(
                                     onClick = {},
                                     enabled = false,
                                     label = { Text("一時停止（準備中）") },
-                                    leadingIcon = { Icon(Icons.Filled.Schedule, "一時停止は準備中") }
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.Schedule,
+                                            "一時停止は準備中"
+                                        )
+                                    }
                                 )
                             }
                             Text(
@@ -243,7 +322,11 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            FilterChip(selected = state.selectedFilter == null, onClick = { vm.setFilter(null) }, label = { Text("すべて") })
+                            FilterChip(
+                                selected = state.selectedFilter == null,
+                                onClick = { vm.setFilter(null) },
+                                label = { Text("すべて") }
+                            )
                             NotificationDecision.entries.forEach { decision ->
                                 FilterChip(
                                     selected = state.selectedFilter == decision,
@@ -259,10 +342,13 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                     ) { item ->
                         NotificationCard(
                             item = item,
-                            onTogglePinned = { vm.togglePinned(item.key, !item.userPinned) },
+                            onTogglePinned = {
+                                vm.togglePinned(item.key, !item.userPinned)
+                            },
                             onDelete = { vm.delete(item.key) },
                             onDecision = { decision ->
-                                val next = if (item.userDecision == decision) null else decision
+                                val next =
+                                    if (item.userDecision == decision) null else decision
                                 vm.setNotificationDecision(item.key, next)
                             },
                             onEditAppRule = { appRuleTarget = item }
@@ -270,14 +356,19 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                     }
                     if (filteredItems.isEmpty()) {
                         item {
-                            EmptyNotificationsCard(hasAnyNotifications = state.items.isNotEmpty())
+                            EmptyNotificationsCard(
+                                hasAnyNotifications = state.items.isNotEmpty()
+                            )
                         }
                     }
                 }
 
                 HomeSection.AppRules -> {
                     item {
-                        ClassificationStatsCard(state.classificationStats)
+                        ClassificationStatsCard(
+                            stats = state.classificationStats,
+                            onReset = { showStatsResetConfirmation = true }
+                        )
                     }
                     if (state.appRules.isEmpty()) {
                         item {
@@ -288,8 +379,13 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                                         .padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("アプリ別ルールはありません", style = MaterialTheme.typography.titleMedium)
-                                    Text("通知履歴から「このアプリのルール」を選ぶと登録できます。")
+                                    Text(
+                                        "アプリ別ルールはありません",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        "通知履歴から「このアプリのルール」を選ぶと登録できます。"
+                                    )
                                 }
                             }
                         }
@@ -297,12 +393,22 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         items(state.appRules, key = AppRule::packageName) { rule ->
                             AppRuleCard(
                                 rule = rule,
-                                changeCount = state.classificationStats.appChangeCounts[rule.packageName] ?: 0,
+                                changeCount =
+                                    state.classificationStats
+                                        .appChangeCounts[rule.packageName] ?: 0,
                                 onDecision = { decision ->
-                                    vm.setAppRule(rule.packageName, rule.appLabel, decision)
+                                    vm.setAppRule(
+                                        rule.packageName,
+                                        rule.appLabel,
+                                        decision
+                                    )
                                 },
                                 onDelete = {
-                                    vm.setAppRule(rule.packageName, rule.appLabel, null)
+                                    vm.setAppRule(
+                                        rule.packageName,
+                                        rule.appLabel,
+                                        null
+                                    )
                                 }
                             )
                         }
@@ -325,7 +431,10 @@ private fun NotificationCard(
     onEditAppRule: () -> Unit
 ) {
     Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -333,29 +442,47 @@ private fun NotificationCard(
                 Row(Modifier.fillMaxWidth(0.72f)) {
                     AppIcon(item.packageName, item.appLabel)
                     Column {
-                        Text(item.appLabel, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            item.appLabel,
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         Text(item.title ?: "タイトルなし")
                     }
                 }
                 IconButton(onClick = onTogglePinned) {
                     Icon(
-                        imageVector = if (item.userPinned) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = if (item.userPinned) "ピン留めを解除" else "ピン留め"
+                        imageVector =
+                            if (item.userPinned) {
+                                Icons.Filled.Star
+                            } else {
+                                Icons.Outlined.Star
+                            },
+                        contentDescription =
+                            if (item.userPinned) {
+                                "ピン留めを解除"
+                            } else {
+                                "ピン留め"
+                            }
                     )
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.DeleteForever, contentDescription = "履歴から削除")
+                    Icon(
+                        Icons.Filled.DeleteForever,
+                        contentDescription = "履歴から削除"
+                    )
                 }
             }
             item.text?.let { Text(it) }
             Text(item.displayReason())
             Text(
-                "判定: ${item.category.displayName()} / ${item.decisionSource.displayName()} / " +
+                "判定: ${item.category.displayName()} / " +
+                    "${item.decisionSource.displayName()} / " +
                     if (item.isActive) "端末に表示中" else "端末から消去済み",
                 style = MaterialTheme.typography.bodySmall
             )
             Text(
-                "自動判定: ${item.automaticDecision.displayName()} — ${item.automaticReason}",
+                "自動判定: ${item.automaticDecision.displayName()} — " +
+                    item.automaticReason,
                 style = MaterialTheme.typography.bodySmall
             )
             FlowRow(
@@ -390,13 +517,22 @@ private fun AppRuleCard(
     onDelete: () -> Unit
 ) {
     Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row {
                 AppIcon(rule.packageName, rule.appLabel)
                 Column {
-                    Text(rule.appLabel, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        rule.appLabel,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     Text(rule.packageName, style = MaterialTheme.typography.bodySmall)
-                    Text("補正・設定: ${changeCount}回", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "補正・設定: ${changeCount}回",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
             FlowRow(
@@ -420,19 +556,41 @@ private fun AppRuleCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ClassificationStatsCard(stats: ClassificationStats) {
+private fun ClassificationStatsCard(
+    stats: ClassificationStats,
+    onReset: () -> Unit
+) {
     val totalCorrections = stats.userOverrideChanges + stats.appRuleChanges
-    val correctionRate = if (stats.automaticallyClassified == 0L) {
-        0
-    } else {
-        ((totalCorrections * 100) / stats.automaticallyClassified).toInt()
-    }
+    val operationsPerNotification =
+        if (stats.automaticallyClassified == 0L) {
+            "0.00"
+        } else {
+            String.format(
+                Locale.getDefault(),
+                "%.2f",
+                totalCorrections.toDouble() / stats.automaticallyClassified
+            )
+        }
 
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Text("端末内の分類傾向", style = MaterialTheme.typography.titleMedium)
-            Text("自動分類 ${stats.automaticallyClassified}件 / 手動補正 ${stats.userOverrideChanges}回 / ルール変更 ${stats.appRuleChanges}回")
-            Text("補正操作率の目安: ${correctionRate}%", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "自動分類 ${stats.automaticallyClassified}件 / " +
+                    "手動補正 ${stats.userOverrideChanges}回 / " +
+                    "ルール変更 ${stats.appRuleChanges}回"
+            )
+            Text(
+                "自動分類1件あたりの補正操作: ${operationsPerNotification}回",
+                style = MaterialTheme.typography.bodySmall
+            )
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -440,13 +598,26 @@ private fun ClassificationStatsCard(stats: ClassificationStats) {
                 NotificationDecision.entries.forEach { decision ->
                     AssistChip(
                         onClick = {},
+                        enabled = false,
                         label = {
-                            Text("${decision.displayName()} ${stats.automaticByDecision[decision] ?: 0}件")
+                            Text(
+                                "${decision.displayName()} " +
+                                    "${stats.automaticByDecision[decision] ?: 0}件"
+                            )
                         }
                     )
                 }
             }
-            Text("統計には通知本文やタイトルを保存せず、外部送信もしません。", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "統計には通知本文やタイトルを保存せず、外部送信もしません。",
+                style = MaterialTheme.typography.bodySmall
+            )
+            TextButton(
+                onClick = onReset,
+                enabled = stats != ClassificationStats()
+            ) {
+                Text("分類統計をリセット")
+            }
         }
     }
 }
@@ -462,7 +633,10 @@ private fun AppRuleDialog(
         title = { Text("${item.appLabel}のルール") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("このアプリから届く通知全体に適用します。通知ごとの手動指定がある場合は、そちらを優先します。")
+                Text(
+                    "このアプリから届く通知全体に適用します。" +
+                        "通知ごとの手動指定がある場合は、そちらを優先します。"
+                )
                 NotificationDecision.entries.forEach { decision ->
                     Button(
                         modifier = Modifier.fillMaxWidth(),
@@ -542,17 +716,39 @@ private fun EmptyNotificationsCard(hasAnyNotifications: Boolean) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                Icons.Filled.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             if (!hasAnyNotifications) {
                 Text("通知がありません", style = MaterialTheme.typography.titleMedium)
                 Text("通知アクセスを許可すると、ここに履歴が表示されます")
             } else {
-                Text("この分類の通知はありません", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "この分類の通知はありません",
+                    style = MaterialTheme.typography.titleMedium
+                )
                 Text("別の分類を選ぶと、保存済みの通知を確認できます")
             }
         }
     }
 }
+
+private fun Boolean.statusText(): String = if (this) "許可済み" else "未許可"
+
+private fun ingestionHealthText(
+    processed: Long,
+    failed: Long,
+    lastError: IngestionErrorCode?
+): String =
+    if (failed == 0L) {
+        "通知取込: 正常（処理済み ${processed}件）"
+    } else {
+        "通知取込: エラー累計 ${failed}件 / 最終コード " +
+            (lastError?.name ?: "UNKNOWN") +
+            "（通知内容はログへ保存しません）"
+    }
 
 private fun AppMode.displayName(): String = when (this) {
     AppMode.Observation -> "観察"
