@@ -29,19 +29,29 @@ object NotificationTextExtractor {
         )
     }
 
+    @Suppress("DEPRECATION")
     private fun extractMessagingStyle(notification: Notification): ExtractedNotificationText? =
         runCatching {
-            val style = Notification.MessagingStyle
-                .extractMessagingStyleFromNotification(notification)
-                ?: return@runCatching null
-            val latestMessage = style.messages
+            val extras = notification.extras
+            val messages: List<Notification.MessagingStyle.Message> =
+                Notification.MessagingStyle.Message.getMessagesFromBundleArray(
+                    extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+                )
+            val latestMessage: Notification.MessagingStyle.Message = messages
                 .asReversed()
                 .firstOrNull { message -> !message.text.isNullOrBlank() }
-            val title = style.conversationTitle?.toString()
-                ?: latestMessage?.senderPerson?.name?.toString()
+                ?: return@runCatching null
+            val title = extras
+                .getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
+                ?.toString()
+                ?: latestMessage.senderPerson?.name?.toString()
+                ?: latestMessage.sender?.toString()
+
             ExtractedNotificationText(
                 title = title?.takeIf(String::isNotBlank),
-                text = latestMessage?.text?.toString()?.takeIf(String::isNotBlank)
+                text = latestMessage.text
+                    ?.toString()
+                    ?.takeIf(String::isNotBlank)
             )
         }.getOrNull()
 }
