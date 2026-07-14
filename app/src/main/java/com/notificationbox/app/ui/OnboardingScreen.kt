@@ -4,11 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
@@ -81,39 +81,43 @@ fun OnboardingScreen(
     Scaffold(
         topBar = { TopAppBar(title = { Text("通知箱へようこそ") }) }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
+            item { Spacer(Modifier.height(4.dp)) }
+            item {
                 LinearProgressIndicator(
                     progress = { (pageIndex + 1).toFloat() / pages.size },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(16.dp))
+            }
+            item { Spacer(Modifier.height(8.dp)) }
+            item {
                 Icon(
                     imageVector = page.icon,
                     contentDescription = null,
                     modifier = Modifier.size(72.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
+            }
+            item {
                 Text(
                     text = page.title,
                     style = MaterialTheme.typography.headlineSmall
                 )
+            }
+            item {
                 Text(
                     text = page.description,
                     style = MaterialTheme.typography.bodyLarge
                 )
-                if (isLastPage) {
+            }
+            if (isLastPage) {
+                item {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -136,55 +140,63 @@ fun OnboardingScreen(
                     }
                 }
             }
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            item { Spacer(Modifier.height(8.dp)) }
+            item {
                 if (isLastPage) {
-                    Button(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = {
-                            onComplete()
-                            context.startActivity(notificationListenerSettingsIntent(context))
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                onComplete()
+                                context.startActivity(notificationListenerSettingsIntent(context))
+                            }
+                        ) {
+                            Text("内容を理解して通知アクセスを設定")
                         }
-                    ) {
-                        Text("内容を理解して通知アクセスを設定")
-                    }
-                    OutlinedButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onSkip
-                    ) {
-                        Text("今は許可せずアプリを見る")
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onSkip
+                        ) {
+                            Text("今は許可せずアプリを見る")
+                        }
                     }
                 } else {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        if (pageIndex > 0) {
-                            OutlinedButton(
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (pageIndex > 0) {
+                                OutlinedButton(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { pageIndex -= 1 }
+                                ) {
+                                    Text("戻る")
+                                }
+                            }
+                            Button(
                                 modifier = Modifier.weight(1f),
-                                onClick = { pageIndex -= 1 }
+                                onClick = { pageIndex += 1 }
                             ) {
-                                Text("戻る")
+                                Text("次へ")
                             }
                         }
-                        Button(
-                            modifier = Modifier.weight(1f),
-                            onClick = { pageIndex += 1 }
+                        TextButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onSkip
                         ) {
-                            Text("次へ")
+                            Text("説明を閉じてアプリを見る")
                         }
-                    }
-                    TextButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onSkip
-                    ) {
-                        Text("説明を後で確認する")
                     }
                 }
             }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
