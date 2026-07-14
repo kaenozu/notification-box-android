@@ -2,7 +2,7 @@
     <string name="notification_reason_app_rule">%1$sを「%2$s」に設定済み</string>
     <string name="notification_reason_user_override">ユーザーがこの通知を「%1$s」に変更</string>
     <string name="dry_run_preview_title">整理プレビュー（非実行）</string>
-    <string name="dry_run_preview_active_count">現在端末に表示中の通知 %1$d件を、内容を保存せず端末内で集計します。</string>
+    <string name="dry_run_preview_active_count">現在端末に表示中の通知 %1$d件を、プレビュー用に内容を追加保存せず端末内で集計します。</string>
     <string name="dry_run_mode_observe">観察のみ</string>
     <string name="dry_run_mode_plan">整理を試算</string>
     <string name="dry_run_planned_classification">予定されるアプリ内分類</string>
