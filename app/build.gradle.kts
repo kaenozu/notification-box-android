@@ -5,6 +5,17 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
 }
 
+val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH").orNull
+val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+val releaseSigningReady = listOf(
+    releaseKeystorePath,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.notificationbox.app"
     compileSdk = 35
@@ -14,8 +25,38 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1"
+        versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = file(checkNotNull(releaseKeystorePath))
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            versionNameSuffix = "-debug"
+        }
+        getByName("release") {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            if (releaseSigningReady) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 
     buildFeatures {
@@ -47,6 +88,8 @@ android {
 
     lint {
         lintConfig = file("lint.xml")
+        checkReleaseBuilds = true
+        abortOnError = true
     }
 
     sourceSets {
