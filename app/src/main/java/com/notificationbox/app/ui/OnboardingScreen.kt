@@ -23,7 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,7 +45,7 @@ private data class OnboardingPage(
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit,
-    onSkip: () -> Unit
+    onContinueWithoutPermission: () -> Unit
 ) {
     val context = LocalContext.current
     val pages = remember {
@@ -158,40 +157,29 @@ fun OnboardingScreen(
                         }
                         OutlinedButton(
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = onSkip
+                            onClick = onContinueWithoutPermission
                         ) {
-                            Text("今は許可せずアプリを見る")
+                            Text("内容を理解して、今は許可せず使う")
                         }
                     }
                 } else {
-                    Column(
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            if (pageIndex > 0) {
-                                OutlinedButton(
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { pageIndex -= 1 }
-                                ) {
-                                    Text("戻る")
-                                }
-                            }
-                            Button(
+                        if (pageIndex > 0) {
+                            OutlinedButton(
                                 modifier = Modifier.weight(1f),
-                                onClick = { pageIndex += 1 }
+                                onClick = { pageIndex -= 1 }
                             ) {
-                                Text("次へ")
+                                Text("戻る")
                             }
                         }
-                        TextButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = onSkip
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = { pageIndex += 1 }
                         ) {
-                            Text("説明を閉じてアプリを見る")
+                            Text("次へ")
                         }
                     }
                 }
