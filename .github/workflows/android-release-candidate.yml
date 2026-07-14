@@ -123,15 +123,25 @@ jobs:
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Build release APK
+      - name: Build release APK and verify manifest boundary
         id: assemble_release
         shell: bash
         run: |
           set +e
-          log="$RUNNER_TEMP/assemble-release.log"
-          ./gradlew assembleRelease --no-daemon > "$log" 2>&1
+          build_log="$RUNNER_TEMP/assemble-release.log"
+          manifest_log="$RUNNER_TEMP/release-manifest.log"
+          ./gradlew assembleRelease --no-daemon > "$build_log" 2>&1
           exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
+          if [ "$exit_code" -eq 0 ]; then
+            bash .github/scripts/verify-release-manifest.sh > "$manifest_log" 2>&1
+            exit_code=$?
+          else
+            : > "$manifest_log"
+          fi
+          if [ "$exit_code" -ne 0 ]; then
+            cat "$build_log"
+            cat "$manifest_log"
+          fi
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -222,6 +232,7 @@ jobs:
             ${{ runner.temp }}/lint-release.log
             ${{ runner.temp }}/bundle-release.log
             ${{ runner.temp }}/assemble-release.log
+            ${{ runner.temp }}/release-manifest.log
             ${{ runner.temp }}/repository.log
             ${{ runner.temp }}/release-candidate-metadata.txt
           if-no-files-found: warn
@@ -253,7 +264,7 @@ jobs:
             echo "Unit tests exit: $UNIT_EXIT"
             echo "Release lint exit: $LINT_EXIT"
             echo "Bundle release exit: $BUNDLE_EXIT"
-            echo "Assemble release exit: $ASSEMBLE_EXIT"
+            echo "Assemble/manifest exit: $ASSEMBLE_EXIT"
             echo "Repository exit: $REPOSITORY_EXIT"
             exit 1
           fi
