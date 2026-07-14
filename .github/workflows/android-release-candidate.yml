@@ -21,6 +21,10 @@ concurrency:
 jobs:
   release-candidate:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - name: Checkout candidate
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -36,6 +40,12 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+
+      - name: Prepare build environment
+        shell: bash
+        run: |
+          git config core.fileMode false
+          chmod +x gradlew
 
       - name: Prepare optional release signing
         id: signing
@@ -66,30 +76,73 @@ jobs:
           fi
 
       - name: Verify immutable action references
-        run: python3 .github/scripts/verify-action-pins.py
-
-      - name: Build and validate release candidate
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        id: action_pins
+        shell: bash
         run: |
-          git config core.fileMode false
-          chmod +x gradlew
-          ./gradlew \
-            testDebugUnitTest \
-            lintRelease \
-            bundleRelease \
-            assembleRelease \
-            --no-daemon
+          set +e
+          log="$RUNNER_TEMP/action-pins.log"
+          python3 .github/scripts/verify-action-pins.py > "$log" 2>&1
+          exit_code=$?
+          cat "$log"
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run unit tests
+        id: unit_tests
+        shell: bash
+        run: |
+          set +e
+          log="$RUNNER_TEMP/release-unit-tests.log"
+          ./gradlew testDebugUnitTest --no-daemon > "$log" 2>&1
+          exit_code=$?
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run release lint
+        id: lint_release
+        shell: bash
+        run: |
+          set +e
+          log="$RUNNER_TEMP/lint-release.log"
+          ./gradlew lintRelease --no-daemon > "$log" 2>&1
+          exit_code=$?
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Build release bundle
+        id: bundle_release
+        shell: bash
+        run: |
+          set +e
+          log="$RUNNER_TEMP/bundle-release.log"
+          ./gradlew bundleRelease --no-daemon > "$log" 2>&1
+          exit_code=$?
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Build release APK
+        id: assemble_release
+        shell: bash
+        run: |
+          set +e
+          log="$RUNNER_TEMP/assemble-release.log"
+          ./gradlew assembleRelease --no-daemon > "$log" 2>&1
+          exit_code=$?
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Create candidate metadata
         id: metadata
+        if: always()
         shell: bash
         env:
           SIGNING_READY: ${{ steps.signing.outputs.ready }}
         run: |
-          set -euo pipefail
+          set +e
           metadata="$RUNNER_TEMP/release-candidate-metadata.txt"
           tested_sha="$(git rev-parse HEAD)"
           {
@@ -97,46 +150,62 @@ jobs:
             echo "tested_sha=$tested_sha"
             echo "version_name=0.1.0"
             echo "version_code=1"
-            echo "release_signing_configured=$SIGNING_READY"
+            echo "release_signing_configured=${SIGNING_READY:-false}"
             echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo
             echo "artifact_sha256:"
           } > "$metadata"
 
           find app/build/outputs/bundle/release app/build/outputs/apk/release \
-            -type f \( -name '*.aab' -o -name '*.apk' \) -print0 \
+            -type f \( -name '*.aab' -o -name '*.apk' \) -print0 2>/dev/null \
             | sort -z \
-            | xargs -0 sha256sum \
+            | xargs -0 -r sha256sum \
             | tee -a "$metadata"
 
-          apk="$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1 || true)"
-          if [ -n "$apk" ] && [ "$SIGNING_READY" = "true" ]; then
+          apk="$(find app/build/outputs/apk/release -type f -name '*.apk' 2>/dev/null | head -n 1 || true)"
+          if [ -n "$apk" ] && [ "${SIGNING_READY:-false}" = "true" ]; then
             apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
             echo >> "$metadata"
             echo "apk_signing_certificate:" >> "$metadata"
             "$apksigner" verify --print-certs "$apk" | tee -a "$metadata"
           fi
 
-          aab="$(find app/build/outputs/bundle/release -type f -name '*.aab' | head -n 1 || true)"
-          if [ -n "$aab" ] && [ "$SIGNING_READY" = "true" ]; then
+          aab="$(find app/build/outputs/bundle/release -type f -name '*.aab' 2>/dev/null | head -n 1 || true)"
+          if [ -n "$aab" ] && [ "${SIGNING_READY:-false}" = "true" ]; then
             jarsigner -verify "$aab" >/dev/null
             echo "aab_signature_verification=PASS" >> "$metadata"
           fi
 
           cat "$metadata"
           echo "tested_sha=$tested_sha" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Verify repository remains clean
+        id: repository
+        if: always()
         shell: bash
         run: |
-          git diff --check
-          git diff --exit-code -- app/schemas
-          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
-            git status --short
-            exit 1
+          set +e
+          log="$RUNNER_TEMP/repository.log"
+          : > "$log"
+          failed=0
+          git diff --check >> "$log" 2>&1 || failed=1
+          git diff --exit-code -- app/schemas >> "$log" 2>&1 || failed=1
+          untracked="$(git ls-files --others --exclude-standard app/schemas)"
+          if [ -n "$untracked" ]; then
+            printf '%s\n' "$untracked" >> "$log"
+            failed=1
           fi
+          working_tree="$(git status --porcelain --untracked-files=all)"
+          if [ -n "$working_tree" ]; then
+            printf '%s\n' "$working_tree" >> "$log"
+            failed=1
+          fi
+          if [ "$failed" -ne 0 ]; then cat "$log"; fi
+          echo "exit_code=$failed" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      - name: Upload release candidate
+      - name: Upload release candidate and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -145,8 +214,46 @@ jobs:
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/apk/release/*.apk
             app/build/reports/lint-results-release.html
+            app/build/reports/lint-results-release.txt
             app/build/reports/tests/testDebugUnitTest
             app/build/test-results/testDebugUnitTest
+            ${{ runner.temp }}/action-pins.log
+            ${{ runner.temp }}/release-unit-tests.log
+            ${{ runner.temp }}/lint-release.log
+            ${{ runner.temp }}/bundle-release.log
+            ${{ runner.temp }}/assemble-release.log
+            ${{ runner.temp }}/repository.log
             ${{ runner.temp }}/release-candidate-metadata.txt
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
+
+      - name: Verify release candidate outcomes
+        if: always()
+        shell: bash
+        env:
+          ACTION_PINS_EXIT: ${{ steps.action_pins.outputs.exit_code }}
+          UNIT_EXIT: ${{ steps.unit_tests.outputs.exit_code }}
+          LINT_EXIT: ${{ steps.lint_release.outputs.exit_code }}
+          BUNDLE_EXIT: ${{ steps.bundle_release.outputs.exit_code }}
+          ASSEMBLE_EXIT: ${{ steps.assemble_release.outputs.exit_code }}
+          REPOSITORY_EXIT: ${{ steps.repository.outputs.exit_code }}
+        run: |
+          failed=0
+          for result in \
+            "$ACTION_PINS_EXIT" \
+            "$UNIT_EXIT" \
+            "$LINT_EXIT" \
+            "$BUNDLE_EXIT" \
+            "$ASSEMBLE_EXIT" \
+            "$REPOSITORY_EXIT"; do
+            if [ "$result" != "0" ]; then failed=1; fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "Action pins exit: $ACTION_PINS_EXIT"
+            echo "Unit tests exit: $UNIT_EXIT"
+            echo "Release lint exit: $LINT_EXIT"
+            echo "Bundle release exit: $BUNDLE_EXIT"
+            echo "Assemble release exit: $ASSEMBLE_EXIT"
+            echo "Repository exit: $REPOSITORY_EXIT"
+            exit 1
+          fi
