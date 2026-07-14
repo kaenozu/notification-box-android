@@ -2,7 +2,6 @@ package com.notificationbox.app.service
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import android.util.Log
 import com.notificationbox.app.App
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
@@ -83,21 +82,12 @@ class NotificationRelayService : NotificationListenerService() {
         runCatching { recordFactory.create(sbn) }.getOrNull()
 
     private fun enqueue(event: NotificationRepositoryEvent) {
-        if (!processor().enqueue(event)) {
-            Log.w(TAG, "Notification event rejected after shutdown: ${event.type}")
-        }
+        processor().enqueue(event)
     }
 
     private fun processor(): NotificationEventProcessor =
         eventProcessor ?: NotificationEventProcessor(
             repository = repository,
-            scope = serviceScope,
-            failureReporter = NotificationEventFailureReporter { eventType ->
-                Log.e(TAG, "Notification repository event failed: $eventType")
-            }
+            scope = serviceScope
         ).also { eventProcessor = it }
-
-    private companion object {
-        const val TAG = "NotificationRelay"
-    }
 }
