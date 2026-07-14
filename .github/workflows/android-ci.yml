@@ -18,150 +18,82 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
       - name: Make Gradle executable
         run: chmod +x gradlew
 
+      - name: Verify immutable action references
+        run: python3 .github/scripts/verify-action-pins.py
+
       - name: Unit tests
-        id: unit_tests
-        run: |
-          set +e
-          ./gradlew testDebugUnitTest --no-daemon > unit-tests.log 2>&1
-          exit_code=$?
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          if [ "$exit_code" -ne 0 ]; then cat unit-tests.log; fi
-          exit 0
+        run: ./gradlew testDebugUnitTest --no-daemon
 
       - name: Lint
-        id: lint
-        run: |
-          set +e
-          ./gradlew lintDebug --no-daemon > lint.log 2>&1
-          exit_code=$?
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          if [ "$exit_code" -ne 0 ]; then cat lint.log; fi
-          exit 0
+        run: ./gradlew lintDebug --no-daemon
 
       - name: Assemble debug
-        id: assemble
-        run: |
-          set +e
-          ./gradlew assembleDebug --no-daemon > assemble.log 2>&1
-          exit_code=$?
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          if [ "$exit_code" -ne 0 ]; then cat assemble.log; fi
-          exit 0
+        run: ./gradlew assembleDebug --no-daemon
 
-      - name: Verify Room schema is committed
-        id: schema
+      - name: Verify repository outputs
         run: |
-          set +e
-          : > schema-diff.log
-          git diff --exit-code -- app/schemas >> schema-diff.log 2>&1
-          tracked_exit=$?
-          schema_status="$(git status --porcelain --untracked-files=all -- app/schemas)"
-          if [ -n "$schema_status" ]; then
-            echo "$schema_status" >> schema-diff.log
-          fi
-          if [ "$tracked_exit" -ne 0 ] || [ -n "$schema_status" ]; then
-            exit_code=1
-            cat schema-diff.log
-          else
-            exit_code=0
-          fi
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          exit 0
+          git diff --check
+          git diff --exit-code -- app/schemas
+          test -z "$(git ls-files --others --exclude-standard app/schemas)"
+          test -z "$(git status --porcelain --untracked-files=all)"
 
-      - name: Upload diagnostics
+      - name: Upload Linux diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-ci-diagnostics
           path: |
-            unit-tests.log
-            lint.log
-            assemble.log
-            schema-diff.log
             app/build/reports/tests/testDebugUnitTest
             app/build/test-results/testDebugUnitTest
+            app/build/reports/lint-results-debug.html
+            app/build/outputs/apk/debug/app-debug.apk
+            app/schemas
           if-no-files-found: warn
-
-      - name: Upload Room schema
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: room-schema
-          path: app/schemas
-          if-no-files-found: error
-
-      - name: Verify outcomes
-        if: always()
-        env:
-          UNIT_EXIT: ${{ steps.unit_tests.outputs.exit_code }}
-          LINT_EXIT: ${{ steps.lint.outputs.exit_code }}
-          ASSEMBLE_EXIT: ${{ steps.assemble.outputs.exit_code }}
-          SCHEMA_EXIT: ${{ steps.schema.outputs.exit_code }}
-        run: |
-          failed=0
-          for result in "$UNIT_EXIT" "$LINT_EXIT" "$ASSEMBLE_EXIT" "$SCHEMA_EXIT"; do
-            if [ "$result" != "0" ]; then
-              failed=1
-            fi
-          done
-          if [ "$failed" -ne 0 ]; then
-            echo "Unit tests exit: $UNIT_EXIT"
-            echo "Lint exit: $LINT_EXIT"
-            echo "Assemble exit: $ASSEMBLE_EXIT"
-            echo "Schema exit: $SCHEMA_EXIT"
-            exit 1
-          fi
+          retention-days: 14
 
   verify-windows:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
       - name: Resolve Robolectric 4.16.1
-        id: robolectric
         shell: pwsh
         run: |
-          $log = Join-Path $env:RUNNER_TEMP "dependency-insight-windows.log"
-          & .\gradlew.bat :app:dependencyInsight `
+          $output = & .\gradlew.bat :app:dependencyInsight `
             --dependency org.robolectric:robolectric `
             --configuration debugUnitTestRuntimeClasspath `
-            --no-daemon 2>&1 | Tee-Object -FilePath $log
-          $exitCode = $LASTEXITCODE
-          $resolved = Select-String -Path $log -Pattern 'org\.robolectric:robolectric:4\.16\.1' -Quiet
-          if (-not $resolved) {
-            Write-Host "Robolectric 4.16.1 was not resolved."
-            $exitCode = 1
+            --no-daemon 2>&1
+          $output | Tee-Object -FilePath "$env:RUNNER_TEMP\dependency-insight-windows.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not ($output | Select-String 'org\.robolectric:robolectric:4\.16\.1' -Quiet)) {
+            throw "Robolectric 4.16.1 was not resolved."
           }
-          "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
-          exit 0
 
       - name: Clean project outputs
         shell: pwsh
@@ -171,145 +103,47 @@ jobs:
           Remove-Item -Recurse -Force .\build -ErrorAction SilentlyContinue
           Remove-Item -Recurse -Force .\app\build -ErrorAction SilentlyContinue
 
-      - name: Unit tests
-        id: unit_tests_windows
+      - name: Windows validation
         shell: pwsh
         run: |
-          $log = Join-Path $env:RUNNER_TEMP "unit-tests-windows.log"
-          & .\gradlew.bat testDebugUnitTest `
+          .\gradlew.bat testDebugUnitTest lintDebug assembleDebug `
             --no-build-cache `
             --rerun-tasks `
             --stacktrace `
-            --no-daemon 2>&1 | Tee-Object -FilePath $log
-          $exitCode = $LASTEXITCODE
-
-          $legacyBackend = Select-String -Path $log -Pattern 'ShadowLegacySQLiteConnection' -Quiet
-          if ($legacyBackend) {
-            Write-Host "ShadowLegacySQLiteConnection was detected."
-            $exitCode = 1
-          }
+            --no-daemon
 
           $testCount = 0
-          $testResultFiles = Get-ChildItem `
-            .\app\build\test-results\testDebugUnitTest\TEST-*.xml `
-            -ErrorAction SilentlyContinue
-          foreach ($testResultFile in $testResultFiles) {
-            [xml]$result = Get-Content -Raw $testResultFile.FullName
-            $testCount += [int]$result.testsuite.tests
-          }
-          Write-Host "Windows unit test count: $testCount"
+          Get-ChildItem .\app\build\test-results\testDebugUnitTest\TEST-*.xml |
+            ForEach-Object {
+              [xml]$result = Get-Content -Raw $_.FullName
+              $testCount += [int]$result.testsuite.tests
+            }
           if ($testCount -lt 47) {
-            Write-Host "Expected at least 47 Windows unit tests."
-            $exitCode = 1
+            throw "Expected at least 47 Windows unit tests; found $testCount."
           }
 
-          "test_count=$testCount" >> $env:GITHUB_OUTPUT
-          "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
-          exit 0
-
-      - name: Lint
-        id: lint_windows
-        shell: pwsh
-        run: |
-          $log = Join-Path $env:RUNNER_TEMP "lint-windows.log"
-          & .\gradlew.bat lintDebug --no-build-cache --no-daemon 2>&1 |
-            Tee-Object -FilePath $log
-          $exitCode = $LASTEXITCODE
-          "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
-          exit 0
-
-      - name: Assemble debug
-        id: assemble_windows
-        shell: pwsh
-        run: |
-          $log = Join-Path $env:RUNNER_TEMP "assemble-windows.log"
-          & .\gradlew.bat assembleDebug --no-build-cache --no-daemon 2>&1 |
-            Tee-Object -FilePath $log
-          $exitCode = $LASTEXITCODE
-          "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
-          exit 0
-
-      - name: Verify repository outputs
-        id: repository_windows
-        shell: pwsh
-        run: |
-          $log = Join-Path $env:RUNNER_TEMP "repository-windows.log"
-          $failed = $false
-
-          git diff --check 2>&1 | Tee-Object -FilePath $log
-          if ($LASTEXITCODE -ne 0) {
-            $failed = $true
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code -- app/schemas
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (git ls-files --others --exclude-standard app/schemas) {
+            throw "Untracked Room schemas detected."
           }
-
-          git diff --exit-code -- app/schemas 2>&1 | Tee-Object -FilePath $log -Append
-          if ($LASTEXITCODE -ne 0) {
-            $failed = $true
+          if (git status --porcelain --untracked-files=all) {
+            throw "Validation modified the working tree."
           }
-
-          $untrackedSchemas = git ls-files --others --exclude-standard app/schemas
-          if ($untrackedSchemas) {
-            $untrackedSchemas | Tee-Object -FilePath $log -Append
-            $failed = $true
-          }
-
-          $workingTree = git status --porcelain --untracked-files=all
-          if ($workingTree) {
-            $workingTree | Tee-Object -FilePath $log -Append
-            $failed = $true
-          }
-
-          $exitCode = if ($failed) { 1 } else { 0 }
-          "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
-          exit 0
 
       - name: Upload Windows diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-ci-diagnostics
           path: |
             ${{ runner.temp }}/dependency-insight-windows.log
-            ${{ runner.temp }}/unit-tests-windows.log
-            ${{ runner.temp }}/lint-windows.log
-            ${{ runner.temp }}/assemble-windows.log
-            ${{ runner.temp }}/repository-windows.log
             app/build/reports/tests/testDebugUnitTest
             app/build/test-results/testDebugUnitTest
+            app/build/reports/lint-results-debug.html
+            app/build/outputs/apk/debug/app-debug.apk
+            app/schemas
           if-no-files-found: warn
-
-      - name: Upload Windows Room schema
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-room-schema
-          path: app/schemas
-          if-no-files-found: error
-
-      - name: Verify Windows outcomes
-        if: always()
-        shell: pwsh
-        env:
-          ROBOLECTRIC_EXIT: ${{ steps.robolectric.outputs.exit_code }}
-          UNIT_EXIT: ${{ steps.unit_tests_windows.outputs.exit_code }}
-          TEST_COUNT: ${{ steps.unit_tests_windows.outputs.test_count }}
-          LINT_EXIT: ${{ steps.lint_windows.outputs.exit_code }}
-          ASSEMBLE_EXIT: ${{ steps.assemble_windows.outputs.exit_code }}
-          REPOSITORY_EXIT: ${{ steps.repository_windows.outputs.exit_code }}
-        run: |
-          $results = @(
-            $env:ROBOLECTRIC_EXIT,
-            $env:UNIT_EXIT,
-            $env:LINT_EXIT,
-            $env:ASSEMBLE_EXIT,
-            $env:REPOSITORY_EXIT
-          )
-          $failedResults = $results | Where-Object { $_ -ne "0" }
-          if ($failedResults.Count -gt 0) {
-            Write-Host "Robolectric exit: $env:ROBOLECTRIC_EXIT"
-            Write-Host "Unit tests exit: $env:UNIT_EXIT"
-            Write-Host "Windows test count: $env:TEST_COUNT"
-            Write-Host "Lint exit: $env:LINT_EXIT"
-            Write-Host "Assemble exit: $env:ASSEMBLE_EXIT"
-            Write-Host "Repository exit: $env:REPOSITORY_EXIT"
-            exit 1
-          }
+          retention-days: 14
