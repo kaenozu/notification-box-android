@@ -1,6 +1,7 @@
 package com.notificationbox.app.service
 
 import android.app.Notification
+import androidx.core.app.NotificationCompat
 
 data class ExtractedNotificationText(
     val title: String?,
@@ -31,23 +32,17 @@ object NotificationTextExtractor {
         )
     }
 
-    @Suppress("DEPRECATION")
     private fun extractMessagingStyle(notification: Notification): ExtractedNotificationText? =
         runCatching {
-            val extras = notification.extras
-            val messages: List<Notification.MessagingStyle.Message> =
-                Notification.MessagingStyle.Message.getMessagesFromBundleArray(
-                    extras.getParcelableArray(Notification.EXTRA_MESSAGES)
-                )
-            val latestMessage: Notification.MessagingStyle.Message = messages
+            val style = NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(notification)
+                ?: return@runCatching null
+            val latestMessage = style.messages
                 .asReversed()
                 .firstOrNull { message -> !message.text.isNullOrBlank() }
                 ?: return@runCatching null
-            val title = extras
-                .getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
-                ?.toString()
-                ?: latestMessage.senderPerson?.name?.toString()
-                ?: latestMessage.sender?.toString()
+            val title = style.conversationTitle?.toString()
+                ?: latestMessage.person?.name?.toString()
 
             ExtractedNotificationText(
                 title = title?.takeIf(String::isNotBlank),
