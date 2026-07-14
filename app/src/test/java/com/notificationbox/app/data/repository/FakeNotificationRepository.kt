@@ -20,6 +20,10 @@ class FakeNotificationRepository : NotificationRepository {
     val deletedKeys = mutableListOf<String>()
     var clearAllCalls: Int = 0
         private set
+    var pruneCalls: Int = 0
+        private set
+    var resetStatsCalls: Int = 0
+        private set
 
     override fun observeNotifications(): Flow<List<NotificationItem>> = items
 
@@ -32,7 +36,10 @@ class FakeNotificationRepository : NotificationRepository {
         stats.value = stats.value.copy(
             automaticallyClassified = stats.value.automaticallyClassified + 1,
             automaticByDecision = stats.value.automaticByDecision +
-                (notification.category to ((stats.value.automaticByDecision[notification.category] ?: 0) + 1))
+                (
+                    notification.category to
+                        ((stats.value.automaticByDecision[notification.category] ?: 0) + 1)
+                    )
         )
     }
 
@@ -59,13 +66,22 @@ class FakeNotificationRepository : NotificationRepository {
 
     override suspend fun markRemoved(key: String, removedAtMillis: Long) {
         items.value = items.value.map {
-            if (it.key == key) it.copy(isActive = false, removedAt = Instant.ofEpochMilli(removedAtMillis)) else it
+            if (it.key == key) {
+                it.copy(
+                    isActive = false,
+                    removedAt = Instant.ofEpochMilli(removedAtMillis)
+                )
+            } else {
+                it
+            }
         }
     }
 
     override suspend fun setPinned(key: String, pinned: Boolean) {
         pinnedUpdates += key to pinned
-        items.value = items.value.map { if (it.key == key) it.copy(userPinned = pinned) else it }
+        items.value = items.value.map {
+            if (it.key == key) it.copy(userPinned = pinned) else it
+        }
     }
 
     override suspend fun setNotificationDecision(
@@ -120,7 +136,9 @@ class FakeNotificationRepository : NotificationRepository {
                 reason = sourceReason(item, finalDecision, source)
             )
         }
-        stats.value = stats.value.copy(appRuleChanges = stats.value.appRuleChanges + 1)
+        stats.value = stats.value.copy(
+            appRuleChanges = stats.value.appRuleChanges + 1
+        )
     }
 
     override suspend fun delete(key: String) {
@@ -131,6 +149,15 @@ class FakeNotificationRepository : NotificationRepository {
     override suspend fun clearAll() {
         clearAllCalls++
         items.value = emptyList()
+    }
+
+    override suspend fun pruneExpired() {
+        pruneCalls++
+    }
+
+    override suspend fun resetClassificationStats() {
+        resetStatsCalls++
+        stats.value = ClassificationStats()
     }
 
     fun emit(newItems: List<NotificationItem>) {
@@ -173,7 +200,12 @@ class FakeNotificationRepository : NotificationRepository {
             category = finalDecision,
             decisionSource = source,
             automaticReason = notification.reason,
-            reason = sourceReason(notification.appLabel, notification.reason, finalDecision, source),
+            reason = sourceReason(
+                notification.appLabel,
+                notification.reason,
+                finalDecision,
+                source
+            ),
             userPinned = existing?.userPinned ?: false,
             isActive = notification.isActive,
             removedAt = notification.removedAtMillis?.let(Instant::ofEpochMilli)
@@ -185,7 +217,12 @@ class FakeNotificationRepository : NotificationRepository {
         item: NotificationItem,
         decision: NotificationDecision,
         source: DecisionSource
-    ): String = sourceReason(item.appLabel, item.automaticReason, decision, source)
+    ): String = sourceReason(
+        item.appLabel,
+        item.automaticReason,
+        decision,
+        source
+    )
 
     private fun sourceReason(
         appLabel: String,
@@ -195,6 +232,7 @@ class FakeNotificationRepository : NotificationRepository {
     ): String = when (source) {
         DecisionSource.Automatic -> automaticReason
         DecisionSource.AppRule -> "${appLabel}を「${decision.name}」に設定済み"
-        DecisionSource.UserOverride -> "ユーザーがこの通知を「${decision.name}」に変更"
+        DecisionSource.UserOverride ->
+            "ユーザーがこの通知を「${decision.name}」に変更"
     }
 }

@@ -52,4 +52,8 @@ interface NotificationRepository {
     suspend fun delete(key: String)
 
     suspend fun clearAll()
+
+    suspend fun pruneExpired()
+
+    suspend fun resetClassificationStats()
 }

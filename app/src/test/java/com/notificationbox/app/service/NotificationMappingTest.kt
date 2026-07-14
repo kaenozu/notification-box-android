@@ -1,6 +1,7 @@
 package com.notificationbox.app.service
 
 import android.app.Notification
+import android.app.Person
 import android.content.Context
 import android.os.Process
 import android.service.notification.StatusBarNotification
@@ -57,7 +58,45 @@ class NotificationMappingTest {
     }
 
     @Test
-    fun `regular text is used when big text is absent`() {
+    fun `messaging style extracts latest structured message`() {
+        val self = Person.Builder().setName("Me").build()
+        val sender = Person.Builder().setName("Alice").build()
+        val notification = Notification.Builder(context, "channel")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setStyle(
+                Notification.MessagingStyle(self)
+                    .setConversationTitle("Project")
+                    .addMessage("older", 1L, sender)
+                    .addMessage("latest", 2L, sender)
+            )
+            .build()
+
+        val extracted = NotificationTextExtractor.extract(notification)
+
+        assertEquals("Project", extracted.title)
+        assertEquals("latest", extracted.text)
+    }
+
+    @Test
+    fun `messaging style falls back to latest sender when conversation title is absent`() {
+        val self = Person.Builder().setName("Me").build()
+        val sender = Person.Builder().setName("Alice").build()
+        val notification = Notification.Builder(context, "channel")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setStyle(
+                Notification.MessagingStyle(self)
+                    .addMessage("latest", 2L, sender)
+            )
+            .build()
+
+        val extracted = NotificationTextExtractor.extract(notification)
+
+        assertEquals("Alice", extracted.title)
+        assertEquals("latest", extracted.text)
+    }
+
+    @Test
+    fun `regular text is used when big and messaging text are absent`() {
         val notification = Notification().apply {
             extras.putCharSequence(Notification.EXTRA_TEXT, "regular text")
         }
@@ -88,7 +127,9 @@ class NotificationMappingTest {
             appLabelResolver = AppLabelResolver { "Notification Box" }
         )
 
-        val record = factory.create(statusBarNotification("com.notificationbox.app"))
+        val record = factory.create(
+            statusBarNotification("com.notificationbox.app")
+        )
 
         assertNull(record)
     }
@@ -99,7 +140,12 @@ class NotificationMappingTest {
             ownPackageName = "com.notificationbox.app",
             appLabelResolver = AppLabelResolver { "Example" }
         )
-        val sbn = statusBarNotification("com.example.app", id = 42, tag = "tag", postTime = 1234)
+        val sbn = statusBarNotification(
+            "com.example.app",
+            id = 42,
+            tag = "tag",
+            postTime = 1234
+        )
 
         val record = requireNotNull(factory.create(sbn))
 

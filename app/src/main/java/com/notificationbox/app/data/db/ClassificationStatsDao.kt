@@ -17,4 +17,7 @@ interface ClassificationStatsDao {
         """
     )
     suspend fun increment(key: String)
+
+    @Query("DELETE FROM classification_stats")
+    suspend fun clearAll()
 }

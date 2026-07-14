@@ -2,12 +2,14 @@ package com.notificationbox.app.permission
 
 class FakePermissionStatusProvider : PermissionStatusProvider {
     var listenerGranted = false
-    var postNotificationsGranted = false
+    var postNotificationsRuntimeGranted = false
+    var appNotificationsEnabled = false
 
     var listenerCallCount = 0
         private set
-
-    var postCallCount = 0
+    var runtimePermissionCallCount = 0
+        private set
+    var appNotificationsCallCount = 0
         private set
 
     override fun isNotificationListenerGranted(): Boolean {
@@ -15,13 +17,19 @@ class FakePermissionStatusProvider : PermissionStatusProvider {
         return listenerGranted
     }
 
-    override fun canPostNotifications(): Boolean {
-        postCallCount++
-        return postNotificationsGranted
+    override fun hasPostNotificationsRuntimePermission(): Boolean {
+        runtimePermissionCallCount++
+        return postNotificationsRuntimeGranted
+    }
+
+    override fun areAppNotificationsEnabled(): Boolean {
+        appNotificationsCallCount++
+        return appNotificationsEnabled
     }
 
     fun resetCallCounts() {
         listenerCallCount = 0
-        postCallCount = 0
+        runtimePermissionCallCount = 0
+        appNotificationsCallCount = 0
     }
 }

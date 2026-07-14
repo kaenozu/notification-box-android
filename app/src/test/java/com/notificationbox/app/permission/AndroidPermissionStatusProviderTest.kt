@@ -16,75 +16,50 @@ class AndroidPermissionStatusProviderTest {
         provider = AndroidPermissionStatusProvider(fakePlatform)
     }
 
-    // Android 12以下: ランタイム権限は無視され、通知有効のみで判定
-
     @Test
-    fun `api32_enabled_true`() {
+    fun `api32 runtime permission is treated as granted`() {
         fakePlatform.sdkInt = 32
-        fakePlatform.areNotificationsEnabled = true
         fakePlatform.hasPostNotificationsPermission = false
 
-        assertTrue("API 32で通知有効ならtrue", provider.canPostNotifications())
+        assertTrue(provider.hasPostNotificationsRuntimePermission())
     }
 
     @Test
-    fun `api32_disabled_false`() {
-        fakePlatform.sdkInt = 32
-        fakePlatform.areNotificationsEnabled = false
-        fakePlatform.hasPostNotificationsPermission = true
-
-        assertFalse("API 32で通知無効ならfalse", provider.canPostNotifications())
-    }
-
-    @Test
-    fun `api33_runtimeDenied_enabled_false`() {
+    fun `api33 runtime permission reflects platform grant`() {
         fakePlatform.sdkInt = 33
         fakePlatform.hasPostNotificationsPermission = false
-        fakePlatform.areNotificationsEnabled = true
+        assertFalse(provider.hasPostNotificationsRuntimePermission())
 
-        assertFalse("API 33で拒否かつ有効ならfalse", provider.canPostNotifications())
+        fakePlatform.hasPostNotificationsPermission = true
+        assertTrue(provider.hasPostNotificationsRuntimePermission())
     }
 
     @Test
-    fun `api33_runtimeGranted_disabled_false`() {
-        fakePlatform.sdkInt = 33
+    fun `app notification setting is independent from runtime permission`() {
         fakePlatform.hasPostNotificationsPermission = true
         fakePlatform.areNotificationsEnabled = false
+        assertTrue(provider.hasPostNotificationsRuntimePermission())
+        assertFalse(provider.areAppNotificationsEnabled())
 
-        assertFalse("API 33で許可かつ無効ならfalse", provider.canPostNotifications())
-    }
-
-    @Test
-    fun `api33_runtimeGranted_enabled_true`() {
-        fakePlatform.sdkInt = 33
-        fakePlatform.hasPostNotificationsPermission = true
-        fakePlatform.areNotificationsEnabled = true
-
-        assertTrue("API 33で許可かつ有効ならtrue", provider.canPostNotifications())
-    }
-
-    @Test
-    fun `api33_runtimeDenied_disabled_false`() {
-        fakePlatform.sdkInt = 33
         fakePlatform.hasPostNotificationsPermission = false
-        fakePlatform.areNotificationsEnabled = false
-
-        assertFalse("API 33で拒否かつ無効ならfalse", provider.canPostNotifications())
+        fakePlatform.areNotificationsEnabled = true
+        assertFalse(provider.hasPostNotificationsRuntimePermission())
+        assertTrue(provider.areAppNotificationsEnabled())
     }
 
     @Test
-    fun `listener_notRegistered_false`() {
+    fun `listener not registered returns false`() {
         fakePlatform.packageName = "com.test.app"
         fakePlatform.enabledListenerPackages = emptySet()
 
-        assertFalse("自アプリ含まないならfalse", provider.isNotificationListenerGranted())
+        assertFalse(provider.isNotificationListenerGranted())
     }
 
     @Test
-    fun `listener_registered_true`() {
+    fun `listener registered returns true`() {
         fakePlatform.packageName = "com.test.app"
         fakePlatform.enabledListenerPackages = setOf("com.test.app")
 
-        assertTrue("自アプリ含むならtrue", provider.isNotificationListenerGranted())
+        assertTrue(provider.isNotificationListenerGranted())
     }
 }
