@@ -2,5 +2,6 @@ package com.notificationbox.app.permission
 
 interface PermissionStatusProvider {
     fun isNotificationListenerGranted(): Boolean
-    fun canPostNotifications(): Boolean
+    fun hasPostNotificationsRuntimePermission(): Boolean
+    fun areAppNotificationsEnabled(): Boolean
 }
