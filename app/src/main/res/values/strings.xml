@@ -1,18 +1,22 @@
 <resources>
+    <string name="app_name">通知箱</string>
+    <string name="notification_listener_label">通知箱の通知アクセス</string>
     <string name="notification_reason_app_rule">%1$sを「%2$s」に設定済み</string>
     <string name="notification_reason_user_override">ユーザーがこの通知を「%1$s」に変更</string>
     <string name="dry_run_preview_title">整理プレビュー（非実行）</string>
     <string name="dry_run_preview_active_count">現在端末に表示中の通知 %1$d件を、プレビュー用に内容を追加保存せず端末内で集計します。</string>
+    <string name="dry_run_preview_active_count_short">表示中の通知 %1$d件を端末内で試算</string>
     <string name="dry_run_mode_observe">観察のみ</string>
     <string name="dry_run_mode_plan">整理を試算</string>
     <string name="dry_run_planned_classification">予定されるアプリ内分類</string>
-    <string name="dry_run_count_keep">現在表示のまま %1$d件</string>
-    <string name="dry_run_count_digest">あとで確認候補 %1$d件</string>
-    <string name="dry_run_count_low">低優先候補 %1$d件</string>
+    <string name="dry_run_count_keep">優先 %1$d件</string>
+    <string name="dry_run_count_digest">あとで確認 %1$d件</string>
+    <string name="dry_run_count_low">低優先 %1$d件</string>
     <string name="dry_run_session_app_count">セッション統計: 対象アプリ %1$d件</string>
     <string name="dry_run_source_automatic">自動分類 %1$d件</string>
     <string name="dry_run_source_app_rule">アプリ別ルール %1$d件</string>
     <string name="dry_run_source_manual">手動指定 %1$d件</string>
     <string name="dry_run_stats_ephemeral">統計は現在のプレビューから都度計算し、保存・外部送信しません。アプリ名、通知識別子、タイトル、本文は統計に含めません。</string>
     <string name="dry_run_no_os_operations">この画面は試算のみです。OS通知の取消、スヌーズ、抑制、遅延、並べ替えは行いません。実行ボタンもありません。</string>
+    <string name="dry_run_no_os_operations_short">試算のみ。元のOS通知は変更しません。</string>
 </resources>
