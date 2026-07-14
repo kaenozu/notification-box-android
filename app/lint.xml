@@ -22,4 +22,12 @@
       library modernization is not mixed into a release-candidate hardening change.
     -->
     <issue id="GradleDependency" severity="ignore" />
+
+    <!--
+      Room 2.8.4 with the repository's Kotlin 2.0.21 toolchain fails under the
+      matching KSP plugin because of a kotlinx.serialization binary incompatibility.
+      The established KAPT path is retained for v0.1.0 and covered by exact CI and
+      migration gates. KSP migration requires a separate coordinated dependency PR.
+    -->
+    <issue id="KaptUsageInsteadOfKsp" severity="ignore" />
 </lint>
