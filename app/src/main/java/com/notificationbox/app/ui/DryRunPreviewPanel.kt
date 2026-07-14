@@ -16,9 +16,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,15 +35,24 @@ import com.notificationbox.app.model.DecisionSource
 @Composable
 fun Phase1NotificationBoxScreen(vm: NotificationBoxViewModel) {
     val dryRunState by vm.dryRunState.collectAsStateWithLifecycle()
+    var panelHeightPx by remember { mutableIntStateOf(0) }
+    val panelHeight = with(LocalDensity.current) { panelHeightPx.toDp() }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        NotificationBoxScreen(vm)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = panelHeight)
+        ) {
+            NotificationBoxScreen(vm)
+        }
         DryRunPreviewPanel(
             state = dryRunState,
             onModeSelected = vm::setOrganizationMode,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .onSizeChanged { panelHeightPx = it.height }
                 .padding(16.dp)
         )
     }
