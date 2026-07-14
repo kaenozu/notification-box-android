@@ -114,14 +114,12 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
             title = { Text("通知履歴を全て削除しますか？") },
-            text = { Text("ピン留めを含む端末内の履歴が削除されます。アプリ別ルールと分類統計は残ります。") },
+            text = { Text("ピン留めを含む端末内の履歴が削除されます。アプリ別ルールは残ります。") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showClearConfirmation = false
-                        vm.clearAll()
-                    }
-                ) {
+                TextButton(onClick = {
+                    showClearConfirmation = false
+                    vm.clearAll()
+                }) {
                     Text("削除")
                 }
             },
@@ -752,7 +750,7 @@ private fun ingestionHealthText(
 
 private fun AppMode.displayName(): String = when (this) {
     AppMode.Observation -> "観察"
-    AppMode.Active -> "整理"
+    AppMode.Active -> "整理（旧設定・OS操作なし）"
 }
 
 private fun NotificationDecision.displayName(): String = when (this) {
@@ -762,7 +760,7 @@ private fun NotificationDecision.displayName(): String = when (this) {
 }
 
 private fun DecisionSource.displayName(): String = when (this) {
-    DecisionSource.Automatic -> "自動分類"
+    DecisionSource.Automatic -> "自動"
     DecisionSource.AppRule -> "アプリ別ルール"
     DecisionSource.UserOverride -> "この通知の手動指定"
 }
