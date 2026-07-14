@@ -5,65 +5,82 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import com.notificationbox.app.model.AppMode
+import com.notificationbox.app.model.DigestSchedule
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 private val Context.notificationPrefsDataStore by preferencesDataStore("notification_box_prefs")
 
+data class NotificationPreferenceState(
+    val mode: AppMode = AppMode.Observation,
+    val pausedUntilText: String = "解除まで",
+    val digestSchedule: DigestSchedule = DigestSchedule()
+)
+
 object NotificationPreferences {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    @Volatile private var appContext: Context? = null
-    @Volatile private var initialized = false
-    private val _ready = MutableStateFlow(false)
+    @Volatile
+    private var appContext: Context? = null
 
     private val modeKey = stringPreferencesKey("mode")
     private val pausedTextKey = stringPreferencesKey("paused_text")
-    private val digestHour1Key = intPreferencesKey("digest_hour_1")
-    private val digestHour2Key = intPreferencesKey("digest_hour_2")
-    private val digestHour3Key = intPreferencesKey("digest_hour_3")
-    private val digestHour4Key = intPreferencesKey("digest_hour_4")
+    private val digestHourKeys = listOf(
+        intPreferencesKey("digest_hour_1"),
+        intPreferencesKey("digest_hour_2"),
+        intPreferencesKey("digest_hour_3"),
+        intPreferencesKey("digest_hour_4")
+    )
 
     fun initialize(context: Context) {
-        if (initialized) return
-        appContext = context.applicationContext
-        initialized = true
-        _ready.value = true
-    }
-
-    fun ready(): StateFlow<Boolean> = _ready
-
-    fun observeMode(): Flow<String> = requireContext().notificationPrefsDataStore.data.map { prefs ->
-        prefs[modeKey] ?: "Observation"
-    }
-
-    suspend fun loadPausedText(): String = requireContext().notificationPrefsDataStore.data.first()[pausedTextKey] ?: "解除まで"
-
-    fun saveMode(mode: String) {
-        scope.launch {
-            requireContext().notificationPrefsDataStore.edit { it[modeKey] = mode }
+        if (appContext == null) {
+            appContext = context.applicationContext
         }
     }
 
-    fun savePausedText(text: String) {
-        scope.launch {
-            requireContext().notificationPrefsDataStore.edit { it[pausedTextKey] = text }
+    fun observeState(): Flow<NotificationPreferenceState> =
+        requireContext().notificationPrefsDataStore.data.map { prefs ->
+            val mode = prefs[modeKey]
+                ?.let { stored -> runCatching { AppMode.valueOf(stored) }.getOrNull() }
+                ?: AppMode.Observation
+            val digestHours = digestHourKeys
+                .mapIndexed { index, key ->
+                    prefs[key] ?: DigestSchedule().hours[index]
+                }
+                .filter { it in 0..23 }
+                .distinct()
+                .ifEmpty { DigestSchedule().hours }
+
+            NotificationPreferenceState(
+                mode = mode,
+                pausedUntilText = prefs[pausedTextKey]
+                    ?.takeIf(String::isNotBlank)
+                    ?: "解除まで",
+                digestSchedule = DigestSchedule(digestHours)
+            )
+        }
+
+    suspend fun saveMode(mode: AppMode) {
+        requireContext().notificationPrefsDataStore.edit { prefs ->
+            prefs[modeKey] = mode.name
         }
     }
 
-    fun saveDigestHours(hours: List<Int>) {
-        scope.launch {
-            requireContext().notificationPrefsDataStore.edit {
-            it[digestHour1Key] = hours.getOrNull(0) ?: 8
-            it[digestHour2Key] = hours.getOrNull(1) ?: 12
-            it[digestHour3Key] = hours.getOrNull(2) ?: 18
-            it[digestHour4Key] = hours.getOrNull(3) ?: 21
+    suspend fun savePausedText(text: String) {
+        requireContext().notificationPrefsDataStore.edit { prefs ->
+            prefs[pausedTextKey] = text
+        }
+    }
+
+    suspend fun saveDigestHours(hours: List<Int>) {
+        val normalized = hours
+            .filter { it in 0..23 }
+            .distinct()
+            .take(digestHourKeys.size)
+        val defaults = DigestSchedule().hours
+
+        requireContext().notificationPrefsDataStore.edit { prefs ->
+            digestHourKeys.forEachIndexed { index, key ->
+                prefs[key] = normalized.getOrNull(index) ?: defaults[index]
             }
         }
     }
