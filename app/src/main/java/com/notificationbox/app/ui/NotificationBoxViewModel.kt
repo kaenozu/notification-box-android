@@ -6,10 +6,16 @@ import androidx.lifecycle.viewModelScope
 import com.notificationbox.app.data.NotificationStore
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
+import com.notificationbox.app.domain.dryrun.DryRunPlanner
+import com.notificationbox.app.domain.dryrun.DryRunPreview
+import com.notificationbox.app.domain.dryrun.OrganizationMode
 import com.notificationbox.app.model.AppMode
 import com.notificationbox.app.model.AppState
 import com.notificationbox.app.model.NotificationDecision
+import com.notificationbox.app.model.NotificationIngestionHealth
+import com.notificationbox.app.model.NotificationItem
 import com.notificationbox.app.permission.PermissionStatusProvider
+import com.notificationbox.app.service.NotificationIngestionHealthStore
 import java.time.Clock
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,37 +28,81 @@ import kotlinx.coroutines.launch
 class NotificationBoxViewModel(
     private val permissionProvider: PermissionStatusProvider,
     private val notificationRepository: NotificationRepository,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val dryRunPlanner: DryRunPlanner = DryRunPlanner(),
+    ingestionHealth: StateFlow<NotificationIngestionHealth> =
+        NotificationIngestionHealthStore.health
 ) : ViewModel() {
 
     data class PermissionState(
         val notificationAccessGranted: Boolean,
-        val postNotificationsGranted: Boolean
+        val postNotificationsRuntimeGranted: Boolean,
+        val appNotificationsEnabled: Boolean
+    )
+
+    data class DryRunState(
+        val mode: OrganizationMode,
+        val preview: DryRunPreview
     )
 
     private val permissionState = MutableStateFlow(readPermissionState())
+    private val organizationMode = MutableStateFlow(OrganizationMode.OBSERVE_ONLY)
+    private val notifications: StateFlow<List<NotificationItem>> =
+        notificationRepository.observeNotifications().stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            emptyList()
+        )
+    private val storedState = combine(
+        NotificationStore.state,
+        ingestionHealth
+    ) { storeState, health ->
+        storeState.copy(ingestionHealth = health)
+    }
 
     val state: StateFlow<AppState> = combine(
-        NotificationStore.state,
-        notificationRepository.observeNotifications(),
+        storedState,
+        notifications,
         notificationRepository.observeAppRules(),
         notificationRepository.observeClassificationStats(),
         permissionState
-    ) { storeState, notifications, appRules, stats, permissions ->
+    ) { storeState, notificationItems, appRules, stats, permissions ->
         storeState.copy(
             notificationAccessGranted = permissions.notificationAccessGranted,
-            postNotificationsGranted = permissions.postNotificationsGranted,
-            items = notifications,
+            postNotificationsRuntimeGranted = permissions.postNotificationsRuntimeGranted,
+            appNotificationsEnabled = permissions.appNotificationsEnabled,
+            items = notificationItems,
             appRules = appRules,
             classificationStats = stats
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppState())
+
+    val dryRunState: StateFlow<DryRunState> = combine(
+        organizationMode,
+        notifications
+    ) { mode, notificationItems ->
+        DryRunState(
+            mode = mode,
+            preview = dryRunPlanner.plan(mode, notificationItems)
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        DryRunState(
+            mode = OrganizationMode.OBSERVE_ONLY,
+            preview = DryRunPreview.observeOnly(activeNotificationCount = 0)
+        )
+    )
 
     fun refreshPermissions() {
         permissionState.value = readPermissionState()
     }
 
     fun setMode(mode: AppMode) = NotificationStore.setMode(mode)
+
+    fun setOrganizationMode(mode: OrganizationMode) {
+        organizationMode.value = mode
+    }
 
     fun setFilter(filter: NotificationDecision?) = NotificationStore.setFilter(filter)
 
@@ -62,6 +112,10 @@ class NotificationBoxViewModel(
 
     fun clearAll() {
         viewModelScope.launch { notificationRepository.clearAll() }
+    }
+
+    fun resetClassificationStats() {
+        viewModelScope.launch { notificationRepository.resetClassificationStats() }
     }
 
     fun togglePinned(key: String, pinned: Boolean) {
@@ -126,7 +180,9 @@ class NotificationBoxViewModel(
     private fun readPermissionState(): PermissionState =
         PermissionState(
             notificationAccessGranted = permissionProvider.isNotificationListenerGranted(),
-            postNotificationsGranted = permissionProvider.canPostNotifications()
+            postNotificationsRuntimeGranted =
+                permissionProvider.hasPostNotificationsRuntimePermission(),
+            appNotificationsEnabled = permissionProvider.areAppNotificationsEnabled()
         )
 }
 
