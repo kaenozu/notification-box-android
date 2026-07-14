@@ -4,32 +4,66 @@ import com.notificationbox.app.model.AppMode
 import com.notificationbox.app.model.AppState
 import com.notificationbox.app.model.DigestSchedule
 import com.notificationbox.app.model.NotificationDecision
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 object NotificationStore {
-    private val _state = MutableStateFlow(AppState())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutableState = MutableStateFlow(AppState())
+    private var restoreJob: Job? = null
 
-    val state: StateFlow<AppState> = _state.asStateFlow()
+    val state: StateFlow<AppState> = mutableState.asStateFlow()
+
+    @Synchronized
+    fun initialize() {
+        if (restoreJob != null) return
+        restoreJob = scope.launch {
+            NotificationPreferences.observeState().collectLatest { preferences ->
+                mutableState.update { current ->
+                    current.copy(
+                        mode = preferences.mode,
+                        pausedUntilText = preferences.pausedUntilText,
+                        digestSchedule = preferences.digestSchedule
+                    )
+                }
+            }
+        }
+    }
 
     fun setMode(mode: AppMode) {
-        _state.update { it.copy(mode = mode) }
-        NotificationPreferences.saveMode(mode.name)
+        mutableState.update { it.copy(mode = mode) }
+        scope.launch {
+            runCatching { NotificationPreferences.saveMode(mode) }
+        }
     }
 
     fun setFilter(filter: NotificationDecision?) {
-        _state.update { it.copy(selectedFilter = filter) }
+        mutableState.update { it.copy(selectedFilter = filter) }
     }
 
     fun pauseSummary(label: String) {
-        _state.update { it.copy(pausedUntilText = label) }
-        NotificationPreferences.savePausedText(label)
+        mutableState.update { it.copy(pausedUntilText = label) }
+        scope.launch {
+            runCatching { NotificationPreferences.savePausedText(label) }
+        }
     }
 
     fun setDigestHours(hours: List<Int>) {
-        _state.update { it.copy(digestSchedule = DigestSchedule(hours)) }
-        NotificationPreferences.saveDigestHours(hours)
+        val normalized = hours.filter { it in 0..23 }.distinct()
+        val schedule = DigestSchedule(
+            hours = normalized.ifEmpty { DigestSchedule().hours }
+        )
+        mutableState.update { it.copy(digestSchedule = schedule) }
+        scope.launch {
+            runCatching { NotificationPreferences.saveDigestHours(schedule.hours) }
+        }
     }
 }
