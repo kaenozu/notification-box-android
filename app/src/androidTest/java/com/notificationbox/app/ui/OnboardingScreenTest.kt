@@ -1,0 +1,64 @@
+package com.notificationbox.app.ui
+
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.notificationbox.app.ui.theme.NotificationBoxTheme
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class OnboardingScreenTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun disclosureMustBeViewedBeforeOnboardingCanFinish() {
+        var completed = false
+
+        composeRule.setContent {
+            NotificationBoxTheme(dynamicColor = false) {
+                OnboardingScreen(
+                    onComplete = { completed = true },
+                    onContinueWithoutPermission = { completed = true }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("通知データは端末内だけで処理")
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("内容を理解して通知アクセスを設定")
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("内容を理解して、今は許可せず使う")
+            .assertDoesNotExist()
+
+        composeRule.onNodeWithText("次へ").performClick()
+        composeRule.onNodeWithText("通知データは端末内だけで処理")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("内容を理解して通知アクセスを設定")
+            .assertDoesNotExist()
+
+        composeRule.onNodeWithText("次へ").performClick()
+        composeRule.onNodeWithText("通知アクセスについて")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("明示事項")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("内容を理解して通知アクセスを設定")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("内容を理解して、今は許可せず使う")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertTrue("Onboarding completion callback was not invoked", completed)
+        }
+    }
+}
