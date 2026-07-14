@@ -33,7 +33,7 @@ fun NotificationBoxApp(
                 !state.onboardingCompleted -> {
                     OnboardingScreen(
                         onComplete = vm::completeOnboarding,
-                        onSkip = vm::completeOnboarding
+                        onContinueWithoutPermission = vm::completeOnboarding
                     )
                 }
                 else -> Phase1NotificationBoxScreen(vm)
