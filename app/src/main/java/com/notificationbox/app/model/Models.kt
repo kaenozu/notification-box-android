@@ -61,11 +61,13 @@ data class DigestSchedule(
 data class AppState(
     val mode: AppMode = AppMode.Observation,
     val notificationAccessGranted: Boolean = false,
-    val postNotificationsGranted: Boolean = false,
+    val postNotificationsRuntimeGranted: Boolean = false,
+    val appNotificationsEnabled: Boolean = false,
     val digestSchedule: DigestSchedule = DigestSchedule(),
     val pausedUntilText: String = "解除まで",
     val items: List<NotificationItem> = emptyList(),
     val appRules: List<AppRule> = emptyList(),
     val classificationStats: ClassificationStats = ClassificationStats(),
+    val ingestionHealth: NotificationIngestionHealth = NotificationIngestionHealth(),
     val selectedFilter: NotificationDecision? = null
 )
