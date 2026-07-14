@@ -1,6 +1,6 @@
 # Human-only release tasks
 
-Everything in this list requires possession of a physical device, a private signing secret, legal/account authority, or authenticated Play Console access. Repository and CI work should be completed before these tasks begin.
+Everything in this list requires possession of a physical device, a private signing secret, legal/account authority, public-hosting authority, or authenticated Play Console access. Repository and CI work should be completed before these tasks begin.
 
 ## 1. Create and protect the upload key
 
@@ -36,11 +36,13 @@ Before production, repeat on Xiaomi, Pixel-family, Samsung, and one additional O
 
 Required human action because the final public URL and publisher identity are controlled by the developer.
 
-- [ ] Review `docs/privacy-policy-ja.md` for the exact store publisher name and contact.
-- [ ] Publish it at a public HTTPS URL.
-- [ ] Ensure the page is readable without login, not geofenced, not a PDF, and not user-editable.
+A ready-to-publish page is already present at `docs/privacy-policy.html`, with `docs/index.html` as its landing page.
+
+- [ ] Review the publisher name and contact in `docs/privacy-policy.html` against the Play developer account.
+- [ ] In repository Settings → Pages, publish from the `main` branch `/docs` folder, or deploy the same HTML to another controlled HTTPS host.
+- [ ] Confirm the resulting page is readable without login, not geofenced, not a PDF, and not user-editable.
 - [ ] Keep the URL stable.
-- [ ] Enter the same URL in Play Console.
+- [ ] Enter the exact public privacy-policy URL in Play Console.
 
 ## 4. Configure Play Console
 
@@ -54,7 +56,8 @@ Required human action because it involves the developer account, legal declarati
 - [ ] Complete target audience, content rating, ads, app access, and government-app declarations.
 - [ ] Add support email and privacy-policy URL.
 - [ ] Add Japanese store listing text.
-- [ ] Upload screenshots created from fictitious notifications only.
+- [ ] Export `store-assets/feature-graphic.svg` to a 1024 × 500 PNG and visually verify Japanese typography.
+- [ ] Capture screenshots from the accepted Play-delivered build using only fictitious notifications.
 - [ ] Add internal testers and publish to internal testing.
 
 ## 5. Review Play-generated evidence
