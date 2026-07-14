@@ -35,7 +35,7 @@ if (-not (Test-Path -LiteralPath $ApkPath -PathType Leaf)) {
 
 $deviceLines = (& adb devices -l) | Where-Object { $_ -match "\sdevice(\s|$)" }
 if ($deviceLines.Count -ne 1) {
-    throw "Exactly one authorized physical device is required. Current devices:`n$($deviceLines -join "`n")"
+    throw "Exactly one authorized physical device is required. Check 'adb devices -l' locally."
 }
 
 $resolvedApk = (Resolve-Path -LiteralPath $ApkPath).Path
@@ -57,7 +57,6 @@ $androidVersion = Invoke-Adb shell getprop ro.build.version.release
 $apiLevel = Invoke-Adb shell getprop ro.build.version.sdk
 $buildNumber = Invoke-Adb shell getprop ro.build.display.id
 $securityPatch = Invoke-Adb shell getprop ro.build.version.security_patch
-$serial = Invoke-Adb get-serialno
 $enabledListeners = Invoke-Adb shell settings get secure enabled_notification_listeners
 $listenerGranted = $enabledListeners -match [regex]::Escape($PackageName)
 $deviceIdleWhitelist = Invoke-Adb shell dumpsys deviceidle whitelist
@@ -77,12 +76,12 @@ $testedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $result = @"
 # Physical-device validation result
 
-> This file intentionally excludes notification titles, bodies, extras, raw notification keys, and screenshots.
+> This file intentionally excludes device serial numbers, notification titles, bodies, extras, raw notification keys, and screenshots.
 
 ## Exact candidate
 
 - Test date (UTC): `$testedAt`
-- APK path: `$resolvedApk`
+- APK file name: `$(Split-Path -Leaf $resolvedApk)`
 - APK SHA-256: `$actualSha256`
 - Package: `$PackageName`
 - Installed version name: `$versionName`
@@ -90,7 +89,6 @@ $result = @"
 
 ## Device
 
-- Serial: `$serial`
 - Manufacturer: `$manufacturer`
 - Model: `$model`
 - Android version: `$androidVersion`
