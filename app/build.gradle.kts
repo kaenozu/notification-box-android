@@ -90,6 +90,7 @@ android {
         lintConfig = file("lint.xml")
         checkReleaseBuilds = true
         abortOnError = true
+        warningsAsErrors = true
     }
 
     sourceSets {
