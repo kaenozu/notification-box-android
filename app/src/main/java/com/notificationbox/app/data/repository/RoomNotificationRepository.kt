@@ -74,13 +74,21 @@ class RoomNotificationRepository(
 
     override suspend fun markRemoved(key: String, removedAtMillis: Long) {
         mutationMutex.withLock {
-            notificationDao.markRemoved(key, removedAtMillis)
+            database.withTransaction {
+                notificationDao.markRemoved(key, removedAtMillis)
+                pruneLocked()
+            }
         }
     }
 
     override suspend fun setPinned(key: String, pinned: Boolean) {
         mutationMutex.withLock {
-            notificationDao.setPinned(key, pinned)
+            database.withTransaction {
+                notificationDao.setPinned(key, pinned)
+                if (!pinned) {
+                    pruneLocked()
+                }
+            }
         }
     }
 
@@ -147,6 +155,20 @@ class RoomNotificationRepository(
     override suspend fun clearAll() {
         mutationMutex.withLock {
             notificationDao.clearAll()
+        }
+    }
+
+    override suspend fun pruneExpired() {
+        mutationMutex.withLock {
+            database.withTransaction {
+                pruneLocked()
+            }
+        }
+    }
+
+    override suspend fun resetClassificationStats() {
+        mutationMutex.withLock {
+            classificationStatsDao.clearAll()
         }
     }
 
