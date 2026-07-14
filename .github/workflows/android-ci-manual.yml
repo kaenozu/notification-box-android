@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout requested revision
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -38,18 +38,19 @@ jobs:
         run: git rev-parse HEAD | tee "$RUNNER_TEMP/tested-sha.txt"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
       - name: Run Linux validation
         run: |
           git config core.fileMode false
           chmod +x gradlew
+          python3 .github/scripts/verify-action-pins.py
           ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
           git diff --check
           git diff --exit-code -- app/schemas
@@ -58,7 +59,7 @@ jobs:
 
       - name: Upload Linux validation evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-ci-exact-ref-linux
           path: |
@@ -75,45 +76,37 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout requested revision
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Record tested revision
         shell: pwsh
-        run: |
-          $testedSha = Join-Path $env:RUNNER_TEMP "tested-sha.txt"
-          git rev-parse HEAD | Tee-Object -FilePath $testedSha
+        run: git rev-parse HEAD | Tee-Object -FilePath "$env:RUNNER_TEMP\tested-sha.txt"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Resolve Robolectric 4.16.1
-        shell: pwsh
-        run: |
-          $log = Join-Path $env:RUNNER_TEMP "dependency-insight-windows.log"
-          $output = & .\gradlew.bat :app:dependencyInsight `
-            --dependency org.robolectric:robolectric `
-            --configuration debugUnitTestRuntimeClasspath `
-            --no-daemon 2>&1
-          $output | Tee-Object -FilePath $log
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-          if (-not ($output | Select-String 'org\.robolectric:robolectric:4\.16\.1' -Quiet)) {
-            throw "Robolectric 4.16.1 was not resolved."
-          }
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
       - name: Run Windows validation
         shell: pwsh
         run: |
+          $output = & .\gradlew.bat :app:dependencyInsight `
+            --dependency org.robolectric:robolectric `
+            --configuration debugUnitTestRuntimeClasspath `
+            --no-daemon 2>&1
+          $output | Tee-Object -FilePath "$env:RUNNER_TEMP\dependency-insight-windows.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not ($output | Select-String 'org\.robolectric:robolectric:4\.16\.1' -Quiet)) {
+            throw "Robolectric 4.16.1 was not resolved."
+          }
+
           .\gradlew.bat testDebugUnitTest lintDebug assembleDebug `
             --no-build-cache `
             --rerun-tasks `
@@ -132,23 +125,18 @@ jobs:
 
           git diff --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
           git diff --exit-code -- app/schemas
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          $untrackedSchemas = git ls-files --others --exclude-standard app/schemas
-          if ($untrackedSchemas) {
-            throw "Untracked Room schemas detected: $untrackedSchemas"
+          if (git ls-files --others --exclude-standard app/schemas) {
+            throw "Untracked Room schemas detected."
           }
-
-          $workingTree = git status --porcelain --untracked-files=all
-          if ($workingTree) {
-            throw "Validation modified the working tree: $workingTree"
+          if (git status --porcelain --untracked-files=all) {
+            throw "Validation modified the working tree."
           }
 
       - name: Upload Windows validation evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-ci-exact-ref-windows
           path: |
