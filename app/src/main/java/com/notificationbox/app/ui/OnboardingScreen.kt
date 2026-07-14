@@ -33,7 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+
+private const val ONBOARDING_LIST_TEST_TAG = "onboarding_list"
 
 private data class OnboardingPage(
     val icon: ImageVector,
@@ -83,7 +86,8 @@ fun OnboardingScreen(
         LazyColumn(
             modifier = Modifier
                 .padding(padding)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 24.dp)
+                .testTag(ONBOARDING_LIST_TEST_TAG),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
