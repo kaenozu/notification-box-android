@@ -8,4 +8,26 @@
     <issue id="ProduceStateDoesNotAssignValue">
         <ignore path="src/main/java/com/notificationbox/app/ui/NotificationBoxScreen.kt" />
     </issue>
+
+    <!--
+      Google Play currently requires new mobile apps to target API 35 or higher.
+      v0.1.0 intentionally remains on API 35 until Android 16/API 36 behavior is
+      exercised on the physical-device matrix instead of being accepted by inference.
+    -->
+    <issue id="OldTargetApi" severity="ignore" />
+
+    <!--
+      Dependencies are intentionally held at the exact versions covered by the
+      Windows/Linux/Room migration gates. Dependabot reports upgrades separately;
+      library modernization is not mixed into a release-candidate hardening change.
+    -->
+    <issue id="GradleDependency" severity="ignore" />
+
+    <!--
+      Room 2.8.4 with the repository's Kotlin 2.0.21 toolchain fails under the
+      matching KSP plugin because of a kotlinx.serialization binary incompatibility.
+      The established KAPT path is retained for v0.1.0 and covered by exact CI and
+      migration gates. KSP migration requires a separate coordinated dependency PR.
+    -->
+    <issue id="KaptUsageInsteadOfKsp" severity="ignore" />
 </lint>

@@ -60,6 +60,8 @@ data class DigestSchedule(
 
 data class AppState(
     val mode: AppMode = AppMode.Observation,
+    val preferencesLoaded: Boolean = false,
+    val onboardingCompleted: Boolean = false,
     val notificationAccessGranted: Boolean = false,
     val postNotificationsRuntimeGranted: Boolean = false,
     val appNotificationsEnabled: Boolean = false,

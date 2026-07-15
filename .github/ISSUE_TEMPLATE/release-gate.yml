@@ -1,0 +1,85 @@
+name: Release gate
+about: Record an exact internal, closed, or production release decision
+labels:
+  - release-blocker
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form records evidence; it does not authorize a release by itself. All automated and manual evidence must refer to the same exact source and artifact identity.
+  - type: dropdown
+    id: target
+    attributes:
+      label: Target transition
+      options:
+        - Internal testing upload
+        - Closed testing promotion
+        - Production submission
+        - Staged rollout increase
+        - Full rollout
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Exact Git commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: workflows
+    attributes:
+      label: Workflow evidence
+      description: Record Android CI, Exact Ref, Migration, and Release Candidate run IDs and conclusions.
+    validations:
+      required: true
+  - type: textarea
+    id: artifact
+    attributes:
+      label: Artifact evidence
+      description: Record artifact name, AAB/APK SHA-256, and signing certificate SHA-256.
+    validations:
+      required: true
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Required gates
+      options:
+        - label: All required workflows passed for the exact source SHA.
+          required: true
+        - label: Unresolved review threads are zero.
+          required: true
+        - label: Required physical-device matrix passed for this transition.
+          required: true
+        - label: No open P0 or P1 defects remain.
+          required: true
+        - label: Privacy policy and Play Data safety match the exact artifact.
+          required: true
+        - label: Store listing and support contact are complete.
+          required: true
+        - label: Rollback owner and procedure are ready.
+          required: true
+        - label: No signing secret or personal notification data is present in evidence.
+          required: true
+  - type: dropdown
+    id: decision
+    attributes:
+      label: Decision
+      options:
+        - GO
+        - NO-GO
+        - PENDING
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Decision rationale and remaining conditions
+    validations:
+      required: true
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Human authorization
+      options:
+        - label: I explicitly authorize only the target transition selected above.
+          required: true

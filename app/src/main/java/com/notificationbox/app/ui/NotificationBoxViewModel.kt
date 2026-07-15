@@ -98,6 +98,10 @@ class NotificationBoxViewModel(
         permissionState.value = readPermissionState()
     }
 
+    fun completeOnboarding() = NotificationStore.setOnboardingCompleted(true)
+
+    fun resetOnboarding() = NotificationStore.setOnboardingCompleted(false)
+
     fun setMode(mode: AppMode) = NotificationStore.setMode(mode)
 
     fun setOrganizationMode(mode: OrganizationMode) {

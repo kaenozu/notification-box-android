@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,5 +45,14 @@ class NotificationPreferencesTest {
             listOf(8, 12, 18, 21),
             NotificationPreferences.observeState().first().digestSchedule.hours
         )
+    }
+
+    @Test
+    fun `onboarding acknowledgement persists explicitly`() = runTest {
+        NotificationPreferences.saveOnboardingCompleted(false)
+        assertFalse(NotificationPreferences.observeState().first().onboardingCompleted)
+
+        NotificationPreferences.saveOnboardingCompleted(true)
+        assertTrue(NotificationPreferences.observeState().first().onboardingCompleted)
     }
 }

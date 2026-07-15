@@ -1,6 +1,7 @@
 package com.notificationbox.app.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -14,6 +15,7 @@ private val Context.notificationPrefsDataStore by preferencesDataStore("notifica
 
 data class NotificationPreferenceState(
     val mode: AppMode = AppMode.Observation,
+    val onboardingCompleted: Boolean = false,
     val pausedUntilText: String = "解除まで",
     val digestSchedule: DigestSchedule = DigestSchedule()
 )
@@ -23,6 +25,7 @@ object NotificationPreferences {
     private var appContext: Context? = null
 
     private val modeKey = stringPreferencesKey("mode")
+    private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed_v1")
     private val pausedTextKey = stringPreferencesKey("paused_text")
     private val digestHourCountKey = intPreferencesKey("digest_hour_count")
     private val digestHourKeys = listOf(
@@ -59,6 +62,7 @@ object NotificationPreferences {
 
             NotificationPreferenceState(
                 mode = mode,
+                onboardingCompleted = prefs[onboardingCompletedKey] ?: false,
                 pausedUntilText = prefs[pausedTextKey]
                     ?.takeIf(String::isNotBlank)
                     ?: "解除まで",
@@ -69,6 +73,12 @@ object NotificationPreferences {
     suspend fun saveMode(mode: AppMode) {
         requireContext().notificationPrefsDataStore.edit { prefs ->
             prefs[modeKey] = mode.name
+        }
+    }
+
+    suspend fun saveOnboardingCompleted(completed: Boolean) {
+        requireContext().notificationPrefsDataStore.edit { prefs ->
+            prefs[onboardingCompletedKey] = completed
         }
     }
 

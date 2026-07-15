@@ -1,0 +1,5 @@
+<resources>
+    <color name="launcher_background">#1B5E8C</color>
+    <color name="navigation_bar_light">#F8F9FC</color>
+    <color name="navigation_bar_dark">#101417</color>
+</resources>

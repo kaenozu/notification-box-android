@@ -1,0 +1,80 @@
+name: Physical-device validation
+about: Record sanitized validation evidence for one exact release candidate and device
+labels:
+  - release-blocker
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use one exact workflow artifact. Do not include notification titles, bodies, extras, raw notification keys, device serials, authentication codes, personal screenshots, or signing secrets.
+  - type: input
+    id: commit
+    attributes:
+      label: Exact Git commit SHA
+      placeholder: 40-character SHA
+    validations:
+      required: true
+  - type: input
+    id: workflow
+    attributes:
+      label: Release Candidate workflow run ID
+    validations:
+      required: true
+  - type: input
+    id: artifact
+    attributes:
+      label: Artifact name
+    validations:
+      required: true
+  - type: textarea
+    id: hashes
+    attributes:
+      label: Artifact identity
+      description: Include APK SHA-256, AAB SHA-256, and signing certificate SHA-256. Do not include secret values.
+    validations:
+      required: true
+  - type: textarea
+    id: device
+    attributes:
+      label: Device details
+      description: Manufacturer, model, Android version, API level, build number, security patch, battery-optimization state. Do not include serial numbers.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Required checks
+      options:
+        - label: First-launch disclosure is readable and accurate.
+          required: true
+        - label: Notification access can be granted, revoked, and re-granted.
+          required: true
+        - label: Representative mail and messaging notifications are captured.
+          required: true
+        - label: Manual classification and app rules work with the documented precedence.
+          required: true
+        - label: State survives process restart and device restart.
+          required: true
+        - label: Original OS notifications remain visible and are not cancelled, suppressed, snoozed, delayed, or reordered.
+          required: true
+        - label: Light mode, dark mode, 200% font size, and TalkBack remain operable.
+          required: true
+        - label: Rapid lifecycle and notification-stress checks do not crash or leave stale state.
+          required: true
+        - label: Generated evidence contains no notification content or personal identifiers.
+          required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Overall result
+      options:
+        - PASS
+        - FAIL
+        - BLOCKED
+    validations:
+      required: true
+  - type: textarea
+    id: defects
+    attributes:
+      label: Blocking defects or sanitized observations
+      description: Give reproduction steps without notification content, raw identifiers, or personal data.

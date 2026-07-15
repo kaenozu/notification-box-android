@@ -88,12 +88,19 @@ jobs:
           yes | "$SDKMANAGER" --licenses > /dev/null
           "$SDKMANAGER" "system-images;android-30;aosp_atd;x86"
 
-      - name: Run Room migration instrumentation test
+      - name: Run managed-device instrumentation tests
+        id: managed_device_tests
         run: |
+          set +e
+          log="$RUNNER_TEMP/managed-device-tests.log"
           ./gradlew pixel2Api30DebugAndroidTest \
             -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
             --no-daemon \
-            --stacktrace
+            --stacktrace > "$log" 2>&1
+          exit_code=$?
+          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Upload migration diagnostics
         if: always()
@@ -101,10 +108,21 @@ jobs:
         with:
           name: room-migration-emulator-diagnostics
           path: |
+            ${{ runner.temp }}/managed-device-tests.log
             app/build/outputs/androidTest-results/managedDevice
             app/build/reports/androidTests/managedDevice
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
+
+      - name: Verify managed-device outcome
+        if: always()
+        env:
+          MANAGED_DEVICE_EXIT: ${{ steps.managed_device_tests.outputs.exit_code }}
+        run: |
+          if [ "$MANAGED_DEVICE_EXIT" != "0" ]; then
+            echo "Managed-device tests exit: $MANAGED_DEVICE_EXIT"
+            exit 1
+          fi
 
   verify-installed-apk-migration:
     needs: detect-migration-changes

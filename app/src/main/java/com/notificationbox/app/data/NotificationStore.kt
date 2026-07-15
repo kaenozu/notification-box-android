@@ -30,6 +30,8 @@ object NotificationStore {
                 mutableState.update { current ->
                     current.copy(
                         mode = preferences.mode,
+                        preferencesLoaded = true,
+                        onboardingCompleted = preferences.onboardingCompleted,
                         pausedUntilText = preferences.pausedUntilText,
                         digestSchedule = preferences.digestSchedule
                     )
@@ -42,6 +44,13 @@ object NotificationStore {
         mutableState.update { it.copy(mode = mode) }
         scope.launch {
             runCatching { NotificationPreferences.saveMode(mode) }
+        }
+    }
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        mutableState.update { it.copy(onboardingCompleted = completed) }
+        scope.launch {
+            runCatching { NotificationPreferences.saveOnboardingCompleted(completed) }
         }
     }
 
