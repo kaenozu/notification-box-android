@@ -45,14 +45,18 @@ require_pattern 'android:name="com\.notificationbox\.app\.service\.NotificationR
 require_pattern 'android:permission="android\.permission\.BIND_NOTIFICATION_LISTENER_SERVICE"' 'listener bind permission'
 require_pattern 'android:exported="false"' 'listener service not exported'
 
-# v0.1.0 performs no networking and sends no app-generated notifications.
-forbid_pattern '<uses-permission' 'any requested runtime or normal permission'
-forbid_pattern 'android\.permission\.INTERNET' 'network permission'
-forbid_pattern 'android\.permission\.POST_NOTIFICATIONS' 'notification posting permission'
+# v0.1.0 performs no networking, sends no app-generated notifications, and
+# does not use an advertising identifier. AndroidX may add the app-scoped
+# DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION to the merged manifest, so permit
+# library-generated permissions and reject only permissions that violate the
+# release boundary.
+forbid_pattern 'android:name="android\.permission\.INTERNET"' 'network permission'
+forbid_pattern 'android:name="android\.permission\.POST_NOTIFICATIONS"' 'notification posting permission'
+forbid_pattern 'android:name="com\.google\.android\.gms\.permission\.AD_ID"' 'advertising ID permission'
 
 printf '%s\n' \
   'Release manifest boundary: PASS' \
-  'requested_permissions=0' \
+  'forbidden_release_permissions=0' \
   'backup=disabled' \
   'cleartext_traffic=disabled' \
   'notification_listener_service=present_not_exported'
