@@ -6,6 +6,8 @@ import android.content.Context
 import android.os.Process
 import android.service.notification.StatusBarNotification
 import androidx.test.core.app.ApplicationProvider
+import com.notificationbox.app.model.NotificationContentAvailability
+import com.notificationbox.app.model.NotificationDecision
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -29,6 +31,7 @@ class NotificationMappingTest {
         val extracted = NotificationTextExtractor.extract(notification)
 
         assertEquals("regular title", extracted.title)
+        assertEquals(NotificationContentAvailability.AVAILABLE, extracted.availability)
     }
 
     @Test
@@ -121,6 +124,38 @@ class NotificationMappingTest {
     }
 
     @Test
+    fun `notification with no readable content is marked empty`() {
+        val extracted = NotificationTextExtractor.extract(Notification())
+
+        assertEquals(NotificationContentAvailability.EMPTY, extracted.availability)
+        assertNull(extracted.title)
+        assertNull(extracted.text)
+    }
+
+    @Test
+    fun `content conversion failure preserves notification metadata`() {
+        val notification = Notification.Builder(context, "channel")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .build()
+            .apply {
+                extras.putCharSequence(Notification.EXTRA_TITLE, ThrowingCharSequence())
+            }
+        val factory = NotificationRecordFactory(
+            ownPackageName = "com.notificationbox.app",
+            appLabelResolver = AppLabelResolver { "Example" }
+        )
+        val sbn = statusBarNotification("com.example.app", notification = notification)
+
+        val record = requireNotNull(factory.create(sbn))
+
+        assertEquals(NotificationContentAvailability.REDACTED_OR_UNAVAILABLE, record.contentAvailability)
+        assertEquals(NotificationDecision.HoldForDigest, record.category)
+        assertEquals(sbn.key, record.key)
+        assertNull(record.title)
+        assertNull(record.text)
+    }
+
+    @Test
     fun `own package notifications are excluded`() {
         val factory = NotificationRecordFactory(
             ownPackageName = "com.notificationbox.app",
@@ -168,24 +203,29 @@ class NotificationMappingTest {
         packageName: String,
         id: Int = 1,
         tag: String? = null,
-        postTime: Long = 1000
-    ): StatusBarNotification {
-        val notification = Notification.Builder(context, "channel")
+        postTime: Long = 1000,
+        notification: Notification = Notification.Builder(context, "channel")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("title")
             .setContentText("text")
             .build()
-        return StatusBarNotification(
-            packageName,
-            packageName,
-            id,
-            tag,
-            1000,
-            1000,
-            0,
-            notification,
-            Process.myUserHandle(),
-            postTime
-        )
+    ): StatusBarNotification = StatusBarNotification(
+        packageName,
+        packageName,
+        id,
+        tag,
+        1000,
+        1000,
+        0,
+        notification,
+        Process.myUserHandle(),
+        postTime
+    )
+
+    private class ThrowingCharSequence : CharSequence {
+        override val length: Int = 1
+        override fun get(index: Int): Char = 'x'
+        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this
+        override fun toString(): String = error("unreadable notification text")
     }
 }
