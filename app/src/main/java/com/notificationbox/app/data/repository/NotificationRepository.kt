@@ -2,6 +2,7 @@ package com.notificationbox.app.data.repository
 
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
+import com.notificationbox.app.model.NotificationContentAvailability
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,8 @@ data class NotificationRecord(
     val channelId: String?,
     val category: NotificationDecision,
     val reason: String,
+    val contentAvailability: NotificationContentAvailability =
+        NotificationContentAvailability.AVAILABLE,
     val isActive: Boolean = true,
     val removedAtMillis: Long? = null
 )
