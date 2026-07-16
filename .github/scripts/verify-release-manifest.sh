@@ -37,6 +37,7 @@ forbid_pattern() {
 require_pattern 'package="com\.notificationbox\.app"' 'application package'
 require_pattern 'android:versionCode="1"' 'versionCode 1'
 require_pattern 'android:versionName="0\.1\.0"' 'versionName 0.1.0'
+require_pattern 'android:targetSdkVersion="36"' 'targetSdkVersion 36'
 require_pattern 'android:allowBackup="false"' 'Android backup disabled'
 require_pattern 'android:usesCleartextTraffic="false"' 'cleartext traffic disabled'
 require_pattern 'android:dataExtractionRules="@xml/data_extraction_rules"' 'Android 12+ backup rules'
@@ -56,6 +57,7 @@ forbid_pattern 'android:name="com\.google\.android\.gms\.permission\.AD_ID"' 'ad
 
 printf '%s\n' \
   'Release manifest boundary: PASS' \
+  'target_sdk=36' \
   'forbidden_release_permissions=0' \
   'backup=disabled' \
   'cleartext_traffic=disabled' \
