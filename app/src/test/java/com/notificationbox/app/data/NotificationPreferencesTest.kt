@@ -16,43 +16,45 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class NotificationPreferencesTest {
+    private lateinit var preferences: NotificationPreferences
+
     @Before
-    fun initializePreferences() {
+    fun createPreferences() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        NotificationPreferences.initialize(context)
+        preferences = NotificationPreferences(context)
     }
 
     @Test
     fun `digest schedule restores the saved number of daily times`() = runTest {
-        NotificationPreferences.saveDigestHours(listOf(20))
+        preferences.saveDigestHours(listOf(20))
         assertEquals(
             listOf(20),
-            NotificationPreferences.observeState().first().digestSchedule.hours
+            preferences.observeState().first().digestSchedule.hours
         )
 
-        NotificationPreferences.saveDigestHours(listOf(9, 18))
+        preferences.saveDigestHours(listOf(9, 18))
         assertEquals(
             listOf(9, 18),
-            NotificationPreferences.observeState().first().digestSchedule.hours
+            preferences.observeState().first().digestSchedule.hours
         )
     }
 
     @Test
     fun `invalid empty digest schedule restores defaults`() = runTest {
-        NotificationPreferences.saveDigestHours(emptyList())
+        preferences.saveDigestHours(emptyList())
 
         assertEquals(
             listOf(8, 12, 18, 21),
-            NotificationPreferences.observeState().first().digestSchedule.hours
+            preferences.observeState().first().digestSchedule.hours
         )
     }
 
     @Test
     fun `onboarding acknowledgement persists explicitly`() = runTest {
-        NotificationPreferences.saveOnboardingCompleted(false)
-        assertFalse(NotificationPreferences.observeState().first().onboardingCompleted)
+        preferences.saveOnboardingCompleted(false)
+        assertFalse(preferences.observeState().first().onboardingCompleted)
 
-        NotificationPreferences.saveOnboardingCompleted(true)
-        assertTrue(NotificationPreferences.observeState().first().onboardingCompleted)
+        preferences.saveOnboardingCompleted(true)
+        assertTrue(preferences.observeState().first().onboardingCompleted)
     }
 }
