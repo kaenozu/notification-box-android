@@ -3,9 +3,9 @@ package com.notificationbox.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.notificationbox.app.data.NotificationStore
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
+import com.notificationbox.app.data.settings.SettingsRepository
 import com.notificationbox.app.domain.dryrun.DryRunPlanner
 import com.notificationbox.app.domain.dryrun.DryRunPreview
 import com.notificationbox.app.domain.dryrun.OrganizationMode
@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 class NotificationBoxViewModel(
     private val permissionProvider: PermissionStatusProvider,
     private val notificationRepository: NotificationRepository,
+    private val settingsRepository: SettingsRepository,
     private val notificationContentPresenter: NotificationContentPresenter =
         NotificationContentPresenter.Identity,
     private val clock: Clock = Clock.systemUTC(),
@@ -59,11 +60,20 @@ class NotificationBoxViewModel(
                 SharingStarted.Eagerly,
                 emptyList()
             )
+
     private val storedState = combine(
-        NotificationStore.state,
+        settingsRepository.settings,
         ingestionHealth
-    ) { storeState, health ->
-        storeState.copy(ingestionHealth = health)
+    ) { settings, health ->
+        AppState(
+            mode = settings.mode,
+            preferencesLoaded = settings.preferencesLoaded,
+            onboardingCompleted = settings.onboardingCompleted,
+            digestSchedule = settings.digestSchedule,
+            pausedUntilText = settings.pausedUntilText,
+            selectedFilter = settings.selectedFilter,
+            ingestionHealth = health
+        )
     }
 
     val state: StateFlow<AppState> = combine(
@@ -103,29 +113,31 @@ class NotificationBoxViewModel(
     }
 
     fun completeOnboarding() = launchOperation("初回設定の保存に失敗しました") {
-        NotificationStore.setOnboardingCompleted(true)
+        settingsRepository.setOnboardingCompleted(true)
     }
 
     fun resetOnboarding() = launchOperation("初回説明の再表示設定に失敗しました") {
-        NotificationStore.setOnboardingCompleted(false)
+        settingsRepository.setOnboardingCompleted(false)
     }
 
     fun setMode(mode: AppMode) = launchOperation("モード設定の保存に失敗しました") {
-        NotificationStore.setMode(mode)
+        settingsRepository.setMode(mode)
     }
 
     fun setOrganizationMode(mode: OrganizationMode) {
         organizationMode.value = mode
     }
 
-    fun setFilter(filter: NotificationDecision?) = NotificationStore.setFilter(filter)
+    fun setFilter(filter: NotificationDecision?) {
+        settingsRepository.setFilter(filter)
+    }
 
     fun pause(label: String) = launchOperation("一時停止設定の保存に失敗しました") {
-        NotificationStore.pauseSummary(label)
+        settingsRepository.pauseSummary(label)
     }
 
     fun setDigestHours(hours: List<Int>) = launchOperation("時刻設定の保存に失敗しました") {
-        NotificationStore.setDigestHours(hours)
+        settingsRepository.setDigestHours(hours)
     }
 
     fun clearAll() = launchOperation("通知履歴を削除できませんでした") {
@@ -215,16 +227,17 @@ class NotificationBoxViewModel(
 class NotificationBoxViewModelFactory(
     private val permissionProvider: PermissionStatusProvider,
     private val notificationRepository: NotificationRepository,
+    private val settingsRepository: SettingsRepository,
     private val notificationContentPresenter: NotificationContentPresenter =
         NotificationContentPresenter.Identity
 ) : ViewModelProvider.Factory {
-
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NotificationBoxViewModel::class.java)) {
             return NotificationBoxViewModel(
                 permissionProvider = permissionProvider,
                 notificationRepository = notificationRepository,
+                settingsRepository = settingsRepository,
                 notificationContentPresenter = notificationContentPresenter
             ) as T
         }
