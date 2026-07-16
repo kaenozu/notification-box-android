@@ -83,9 +83,9 @@ internal class NotificationCommandQueue(
         if (closed.get()) {
             healthReporter.recordFailure(IngestionErrorCode.COMMAND_QUEUE_CLOSED)
         } else {
-            healthReporter.recordFailure(IngestionErrorCode.COMMAND_QUEUE_OVERFLOW)
+            healthReporter.recordFailure(IngestionErrorCode.REPOSITORY_OPERATION_FAILED)
             runCatching(onOverflow).onFailure {
-                healthReporter.recordFailure(IngestionErrorCode.RECONCILIATION_REQUEST_FAILED)
+                healthReporter.recordFailure(IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED)
             }
         }
         return false
