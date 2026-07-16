@@ -48,7 +48,8 @@ private enum class HomeSection {
 @Composable
 fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     val context = LocalContext.current
-    val state by vm.state.collectAsStateWithLifecycle()
+    val history by vm.historyState.collectAsStateWithLifecycle()
+    val settingsRules by vm.settingsRulesState.collectAsStateWithLifecycle()
     var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
     var showStatsResetConfirmation by rememberSaveable { mutableStateOf(false) }
     var showPrivacyInfo by rememberSaveable { mutableStateOf(false) }
@@ -57,8 +58,10 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     var deleteTarget by remember { mutableStateOf<NotificationItem?>(null) }
     val selectedSection = HomeSection.entries[selectedSectionIndex]
     val openListenerSettings = remember(context) { notificationListenerSettingsIntent(context) }
-    val filteredItems = remember(state.items, state.selectedFilter) {
-        state.items.filter { state.selectedFilter == null || it.category == state.selectedFilter }
+    val filteredItems = remember(history.items, history.selectedFilter) {
+        history.items.filter {
+            history.selectedFilter == null || it.category == history.selectedFilter
+        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -184,11 +187,11 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
             item { Spacer(Modifier.height(4.dp)) }
             item {
                 StatusCard(
-                    notificationAccessGranted = state.notificationAccessGranted,
-                    processed = state.ingestionHealth.processedCommands,
-                    failed = state.ingestionHealth.failedCommands,
-                    lastError = state.ingestionHealth.lastError,
-                    hasItems = state.items.isNotEmpty(),
+                    notificationAccessGranted = history.notificationAccessGranted,
+                    processed = history.ingestionHealth.processedCommands,
+                    failed = history.ingestionHealth.failedCommands,
+                    lastError = history.ingestionHealth.lastError,
+                    hasItems = history.items.isNotEmpty(),
                     onOpenListenerSettings = { context.startActivity(openListenerSettings) },
                     onSeed = vm::seed,
                     onClearAll = { showClearConfirmation = true }
@@ -205,14 +208,14 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         onClick = {
                             selectedSectionIndex = HomeSection.Notifications.ordinal
                         },
-                        label = { Text("通知履歴 (${state.items.size})") }
+                        label = { Text("通知履歴 (${history.items.size})") }
                     )
                     FilterChip(
                         selected = selectedSection == HomeSection.AppRules,
                         onClick = {
                             selectedSectionIndex = HomeSection.AppRules.ordinal
                         },
-                        label = { Text("アプリ別ルール (${state.appRules.size})") }
+                        label = { Text("アプリ別ルール (${settingsRules.appRules.size})") }
                     )
                 }
             }
@@ -225,13 +228,13 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             FilterChip(
-                                selected = state.selectedFilter == null,
+                                selected = history.selectedFilter == null,
                                 onClick = { vm.setFilter(null) },
                                 label = { Text("すべて") }
                             )
                             NotificationDecision.entries.forEach { decision ->
                                 FilterChip(
-                                    selected = state.selectedFilter == decision,
+                                    selected = history.selectedFilter == decision,
                                     onClick = { vm.setFilter(decision) },
                                     label = { Text(decision.displayName()) }
                                 )
@@ -255,8 +258,8 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                     if (filteredItems.isEmpty()) {
                         item {
                             EmptyNotificationsCard(
-                                hasAnyNotifications = state.items.isNotEmpty(),
-                                notificationAccessGranted = state.notificationAccessGranted,
+                                hasAnyNotifications = history.items.isNotEmpty(),
+                                notificationAccessGranted = history.notificationAccessGranted,
                                 onOpenListenerSettings = {
                                     context.startActivity(openListenerSettings)
                                 }
@@ -268,18 +271,19 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                 HomeSection.AppRules -> {
                     item {
                         ClassificationStatsCard(
-                            stats = state.classificationStats,
+                            stats = settingsRules.classificationStats,
                             onReset = { showStatsResetConfirmation = true }
                         )
                     }
-                    if (state.appRules.isEmpty()) {
+                    if (settingsRules.appRules.isEmpty()) {
                         item { EmptyAppRulesCard() }
                     } else {
-                        items(state.appRules, key = AppRule::packageName) { rule ->
+                        items(settingsRules.appRules, key = AppRule::packageName) { rule ->
                             AppRuleCard(
                                 rule = rule,
                                 changeCount =
-                                    state.classificationStats.appChangeCounts[rule.packageName] ?: 0,
+                                    settingsRules.classificationStats
+                                        .appChangeCounts[rule.packageName] ?: 0,
                                 onDecision = { decision ->
                                     vm.setAppRule(rule.packageName, rule.appLabel, decision)
                                 },
