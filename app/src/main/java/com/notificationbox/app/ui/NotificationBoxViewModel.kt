@@ -18,17 +18,21 @@ import com.notificationbox.app.permission.PermissionStatusProvider
 import com.notificationbox.app.service.NotificationIngestionHealthStore
 import java.time.Clock
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class NotificationBoxViewModel(
     private val permissionProvider: PermissionStatusProvider,
     private val notificationRepository: NotificationRepository,
+    private val notificationContentPresenter: NotificationContentPresenter =
+        NotificationContentPresenter.Identity,
     private val clock: Clock = Clock.systemUTC(),
     private val dryRunPlanner: DryRunPlanner = DryRunPlanner(),
     ingestionHealth: StateFlow<NotificationIngestionHealth> =
@@ -48,11 +52,13 @@ class NotificationBoxViewModel(
     val operationMessage: StateFlow<String?> = mutableOperationMessage.asStateFlow()
 
     private val notifications: StateFlow<List<NotificationItem>> =
-        notificationRepository.observeNotifications().stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            emptyList()
-        )
+        notificationRepository.observeNotifications()
+            .map { items -> items.map(notificationContentPresenter::present) }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                emptyList()
+            )
     private val storedState = combine(
         NotificationStore.state,
         ingestionHealth
@@ -195,21 +201,32 @@ class NotificationBoxViewModel(
         operation: suspend () -> Unit
     ) {
         viewModelScope.launch {
-            runCatching { operation() }
-                .onFailure { mutableOperationMessage.value = failureMessage }
+            try {
+                operation()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                mutableOperationMessage.value = failureMessage
+            }
         }
     }
 }
 
 class NotificationBoxViewModelFactory(
     private val permissionProvider: PermissionStatusProvider,
-    private val notificationRepository: NotificationRepository
+    private val notificationRepository: NotificationRepository,
+    private val notificationContentPresenter: NotificationContentPresenter =
+        NotificationContentPresenter.Identity
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NotificationBoxViewModel::class.java)) {
-            return NotificationBoxViewModel(permissionProvider, notificationRepository) as T
+            return NotificationBoxViewModel(
+                permissionProvider = permissionProvider,
+                notificationRepository = notificationRepository,
+                notificationContentPresenter = notificationContentPresenter
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
