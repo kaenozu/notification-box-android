@@ -19,7 +19,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.notificationbox.app.R
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.NotificationDecision
@@ -41,7 +43,10 @@ internal fun AppRuleCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(rule.appLabel, style = MaterialTheme.typography.titleMedium)
                     Text(rule.packageName, style = MaterialTheme.typography.bodySmall)
-                    Text("補正・設定: ${changeCount}回", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(R.string.notification_rule_change_count, changeCount),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
             FlowRow(
@@ -56,7 +61,9 @@ internal fun AppRuleCard(
                     )
                 }
             }
-            TextButton(onClick = onDelete) { Text("アプリ別設定を解除") }
+            TextButton(onClick = onDelete) {
+                Text(stringResource(R.string.notification_rule_remove))
+            }
         }
     }
 }
@@ -81,14 +88,23 @@ internal fun ClassificationStatsCard(stats: ClassificationStats, onReset: () -> 
         )
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("端末内の分類傾向", style = MaterialTheme.typography.titleMedium)
             Text(
-                "自動分類 ${stats.automaticallyClassified}件 / " +
-                    "手動補正 ${stats.userOverrideChanges}回 / " +
-                    "ルール変更 ${stats.appRuleChanges}回"
+                stringResource(R.string.notification_stats_title),
+                style = MaterialTheme.typography.titleMedium
             )
             Text(
-                "自動分類1件あたりの補正操作: ${operationsPerNotification}回",
+                stringResource(
+                    R.string.notification_stats_summary,
+                    stats.automaticallyClassified,
+                    stats.userOverrideChanges,
+                    stats.appRuleChanges
+                )
+            )
+            Text(
+                stringResource(
+                    R.string.notification_stats_operation_ratio,
+                    operationsPerNotification
+                ),
                 style = MaterialTheme.typography.bodySmall
             )
             FlowRow(
@@ -100,17 +116,23 @@ internal fun ClassificationStatsCard(stats: ClassificationStats, onReset: () -> 
                         onClick = {},
                         enabled = false,
                         label = {
-                            Text("${decision.displayName()} ${stats.automaticByDecision[decision] ?: 0}件")
+                            Text(
+                                stringResource(
+                                    R.string.notification_stats_decision_count,
+                                    decision.displayName(),
+                                    stats.automaticByDecision[decision] ?: 0
+                                )
+                            )
                         }
                     )
                 }
             }
             Text(
-                "統計には通知本文やタイトルを保存せず、外部送信もしません。",
+                stringResource(R.string.notification_stats_privacy),
                 style = MaterialTheme.typography.bodySmall
             )
             TextButton(onClick = onReset, enabled = stats != ClassificationStats()) {
-                Text("分類統計をリセット")
+                Text(stringResource(R.string.notification_stats_reset_action))
             }
         }
     }
@@ -124,27 +146,38 @@ internal fun AppRuleDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${item.appLabel}のルール") },
+        title = {
+            Text(stringResource(R.string.notification_rule_title, item.appLabel))
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("このアプリ全体に適用します。通知ごとの手動指定を優先します。")
+                Text(stringResource(R.string.notification_rule_body))
                 NotificationDecision.entries.forEach { decision ->
                     Button(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onSelect(decision) }
                     ) {
-                        Text("常に${decision.displayName()}")
+                        Text(
+                            stringResource(
+                                R.string.notification_rule_always,
+                                decision.displayName()
+                            )
+                        )
                     }
                 }
                 TextButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { onSelect(null) }
                 ) {
-                    Text("アプリ別設定を解除")
+                    Text(stringResource(R.string.notification_rule_remove))
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("閉じる") } }
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_close))
+            }
+        }
     )
 }
 
@@ -155,8 +188,11 @@ internal fun EmptyAppRulesCard() {
             Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("アプリ別ルールはありません", style = MaterialTheme.typography.titleMedium)
-            Text("通知履歴から「このアプリのルール」を選ぶと登録できます。")
+            Text(
+                stringResource(R.string.notification_rules_empty_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(stringResource(R.string.notification_rules_empty_body))
         }
     }
 }
