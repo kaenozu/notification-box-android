@@ -8,6 +8,7 @@ import com.notificationbox.app.data.db.NotificationEntity
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.DecisionSource
+import com.notificationbox.app.model.NotificationContentAvailability
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
 import java.time.Clock
@@ -209,6 +210,7 @@ class RoomNotificationRepository(
             category = category.name,
             reason = reason,
             userDecision = userDecision,
+            contentAvailability = contentAvailability.name,
             userPinned = userPinned,
             isActive = isActive,
             removedAtMillis = removedAtMillis
@@ -224,13 +226,24 @@ class RoomNotificationRepository(
             ruleDecision != null -> DecisionSource.AppRule
             else -> DecisionSource.Automatic
         }
+        val availability = contentAvailability.toContentAvailability()
 
         return NotificationItem(
             key = key,
             packageName = packageName,
             appLabel = appLabel,
-            title = title,
-            text = text,
+            title = when (availability) {
+                NotificationContentAvailability.AVAILABLE -> title
+                NotificationContentAvailability.EMPTY -> title ?: "内容なし"
+                NotificationContentAvailability.REDACTED_OR_UNAVAILABLE ->
+                    "内容を取得できません"
+            },
+            text = when (availability) {
+                NotificationContentAvailability.AVAILABLE -> text
+                NotificationContentAvailability.EMPTY -> null
+                NotificationContentAvailability.REDACTED_OR_UNAVAILABLE ->
+                    "Androidまたは通知元アプリにより通知内容が非公開です。"
+            },
             postTime = Instant.ofEpochMilli(postTimeMillis),
             automaticDecision = automaticDecision,
             userDecision = userOverride,
@@ -239,6 +252,7 @@ class RoomNotificationRepository(
             decisionSource = source,
             automaticReason = reason,
             reason = reason,
+            contentAvailability = availability,
             userPinned = userPinned,
             isActive = isActive,
             removedAt = removedAtMillis?.let(Instant::ofEpochMilli)
@@ -280,6 +294,10 @@ class RoomNotificationRepository(
 
     private fun String.toDecisionOrDefault(): NotificationDecision =
         toDecisionOrNull() ?: NotificationDecision.HoldForDigest
+
+    private fun String.toContentAvailability(): NotificationContentAvailability =
+        runCatching { NotificationContentAvailability.valueOf(this) }
+            .getOrDefault(NotificationContentAvailability.REDACTED_OR_UNAVAILABLE)
 
     companion object {
         internal const val MAX_NOTIFICATION_COUNT = 500
