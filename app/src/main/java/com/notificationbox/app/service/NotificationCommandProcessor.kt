@@ -3,6 +3,7 @@ package com.notificationbox.app.service
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
 import com.notificationbox.app.model.IngestionErrorCode
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -57,9 +58,14 @@ internal class NotificationCommandProcessor(
 internal class NotificationCommandQueue(
     scope: CoroutineScope,
     private val processor: NotificationCommandProcessor,
-    private val healthReporter: NotificationIngestionHealthReporter
+    private val healthReporter: NotificationIngestionHealthReporter,
+    capacity: Int = DEFAULT_CAPACITY,
+    private val onOverflow: () -> Unit = {}
 ) {
-    private val commands = Channel<NotificationCommand>(capacity = Channel.UNLIMITED)
+    private val closed = AtomicBoolean(false)
+    private val commands = Channel<NotificationCommand>(capacity = capacity.also {
+        require(it > 0) { "Notification command queue capacity must be positive" }
+    })
     private val consumerJob: Job = scope.launch {
         for (command in commands) {
             processor.process(command)
@@ -67,19 +73,36 @@ internal class NotificationCommandQueue(
     }
 
     fun submit(command: NotificationCommand): Boolean {
-        val accepted = commands.trySend(command).isSuccess
-        if (!accepted) {
+        if (closed.get()) {
             healthReporter.recordFailure(IngestionErrorCode.COMMAND_QUEUE_CLOSED)
+            return false
         }
-        return accepted
+
+        if (commands.trySend(command).isSuccess) return true
+
+        if (closed.get()) {
+            healthReporter.recordFailure(IngestionErrorCode.COMMAND_QUEUE_CLOSED)
+        } else {
+            healthReporter.recordFailure(IngestionErrorCode.COMMAND_QUEUE_OVERFLOW)
+            runCatching(onOverflow).onFailure {
+                healthReporter.recordFailure(IngestionErrorCode.RECONCILIATION_REQUEST_FAILED)
+            }
+        }
+        return false
     }
 
     /** Stops new submissions while allowing all already-accepted commands to drain. */
     fun close() {
-        commands.close()
+        if (closed.compareAndSet(false, true)) {
+            commands.close()
+        }
     }
 
     suspend fun join() {
         consumerJob.join()
+    }
+
+    companion object {
+        internal const val DEFAULT_CAPACITY = 256
     }
 }
