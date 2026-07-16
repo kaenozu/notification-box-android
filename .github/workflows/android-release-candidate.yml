@@ -98,7 +98,7 @@ jobs:
             echo "tested_sha=${{ steps.identity.outputs.tested_sha }}"
             echo "version_name=0.1.0"
             echo "version_code=1"
-            echo "target_sdk=36"
+            echo "target_sdk=37"
             echo "signed=false"
             echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo
@@ -241,7 +241,7 @@ jobs:
             echo "tested_sha=$TESTED_SHA"
             echo "version_name=0.1.0"
             echo "version_code=1"
-            echo "target_sdk=36"
+            echo "target_sdk=37"
             echo "signed=true"
             echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo
