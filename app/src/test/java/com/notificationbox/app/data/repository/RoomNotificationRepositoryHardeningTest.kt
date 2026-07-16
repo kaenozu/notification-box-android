@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -53,7 +54,35 @@ class RoomNotificationRepositoryHardeningTest {
     }
 
     @Test
-    fun `explicit prune removes expired rows without receiving a new notification`() = runTest {
+    fun `old notification remains for seven days after it ends`() = runTest {
+        val oldPostTime = nowMillis - RoomNotificationRepository.RETENTION.toMillis() - 1
+        database.notificationDao().upsert(
+            NotificationEntity(
+                key = "recently-ended",
+                packageName = "com.example.app",
+                appLabel = "Example",
+                title = "title",
+                text = "text",
+                postTimeMillis = oldPostTime,
+                notificationId = 1,
+                tag = null,
+                channelId = "channel",
+                category = NotificationDecision.KeepNow.name,
+                reason = "test",
+                userDecision = null,
+                userPinned = false,
+                isActive = false,
+                removedAtMillis = nowMillis
+            )
+        )
+
+        repository.pruneExpired()
+
+        assertNotNull(database.notificationDao().getByKey("recently-ended"))
+    }
+
+    @Test
+    fun `explicit prune removes rows whose removal time expired`() = runTest {
         database.notificationDao().upsert(expiredEntity("expired"))
 
         repository.pruneExpired()
@@ -113,7 +142,7 @@ class RoomNotificationRepositoryHardeningTest {
             appLabel = "Example",
             title = "title",
             text = "text",
-            postTimeMillis = expired,
+            postTimeMillis = nowMillis,
             notificationId = 1,
             tag = null,
             channelId = "channel",
