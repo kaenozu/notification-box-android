@@ -10,6 +10,8 @@ import com.notificationbox.app.permission.AndroidNotificationPermissionPlatform
 import com.notificationbox.app.permission.AndroidPermissionStatusProvider
 import com.notificationbox.app.permission.NotificationPermissionPlatform
 import com.notificationbox.app.permission.PermissionStatusProvider
+import com.notificationbox.app.ui.AndroidNotificationContentPresenter
+import com.notificationbox.app.ui.NotificationContentPresenter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,6 +24,8 @@ class AppContainer(app: Application) {
     val permissionStatusProvider: PermissionStatusProvider = AndroidPermissionStatusProvider(platform)
     val notificationRepository: NotificationRepository =
         RoomNotificationRepository(database = database)
+    val notificationContentPresenter: NotificationContentPresenter =
+        AndroidNotificationContentPresenter(app)
 }
 
 class App : Application() {
