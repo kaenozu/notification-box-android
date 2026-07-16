@@ -40,39 +40,31 @@ object NotificationStore {
         }
     }
 
-    fun setMode(mode: AppMode) {
+    suspend fun setMode(mode: AppMode) {
+        NotificationPreferences.saveMode(mode)
         mutableState.update { it.copy(mode = mode) }
-        scope.launch {
-            runCatching { NotificationPreferences.saveMode(mode) }
-        }
     }
 
-    fun setOnboardingCompleted(completed: Boolean) {
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        NotificationPreferences.saveOnboardingCompleted(completed)
         mutableState.update { it.copy(onboardingCompleted = completed) }
-        scope.launch {
-            runCatching { NotificationPreferences.saveOnboardingCompleted(completed) }
-        }
     }
 
     fun setFilter(filter: NotificationDecision?) {
         mutableState.update { it.copy(selectedFilter = filter) }
     }
 
-    fun pauseSummary(label: String) {
+    suspend fun pauseSummary(label: String) {
+        NotificationPreferences.savePausedText(label)
         mutableState.update { it.copy(pausedUntilText = label) }
-        scope.launch {
-            runCatching { NotificationPreferences.savePausedText(label) }
-        }
     }
 
-    fun setDigestHours(hours: List<Int>) {
+    suspend fun setDigestHours(hours: List<Int>) {
         val normalized = hours.filter { it in 0..23 }.distinct()
         val schedule = DigestSchedule(
             hours = normalized.ifEmpty { DigestSchedule().hours }
         )
+        NotificationPreferences.saveDigestHours(schedule.hours)
         mutableState.update { it.copy(digestSchedule = schedule) }
-        scope.launch {
-            runCatching { NotificationPreferences.saveDigestHours(schedule.hours) }
-        }
     }
 }
