@@ -10,6 +10,7 @@ import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.model.NotificationSummary
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -44,6 +45,18 @@ class RoomNotificationRepository(
 
     override fun observeClassificationStats(): Flow<ClassificationStats> =
         classificationStatsDao.observeAll().map(::toClassificationStats)
+
+    override fun observeSummarySince(since: Instant): Flow<NotificationSummary> =
+        notificationDao.observeSummarySince(since.toEpochMilli()).map { row ->
+            NotificationSummary(
+                totalCount = row.totalCount,
+                keepNowCount = row.keepNowCount,
+                holdForDigestCount = row.holdForDigestCount,
+                ignoreCount = row.ignoreCount,
+                periodStart = since,
+                generatedAt = clock.instant()
+            )
+        }
 
     override suspend fun upsert(notification: NotificationRecord) {
         mutationMutex.withLock {

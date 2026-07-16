@@ -10,12 +10,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.notificationbox.app.ui.summary.NotificationSummaryViewModel
+import com.notificationbox.app.ui.summary.NotificationSummaryViewModelFactory
 import com.notificationbox.app.ui.theme.NotificationBoxTheme
 
 @Composable
 fun NotificationBoxApp(
     factory: NotificationBoxViewModelFactory,
-    vm: NotificationBoxViewModel = viewModel(factory = factory)
+    summaryFactory: NotificationSummaryViewModelFactory,
+    vm: NotificationBoxViewModel = viewModel(factory = factory),
+    summaryVm: NotificationSummaryViewModel = viewModel(factory = summaryFactory)
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
 
@@ -36,7 +40,7 @@ fun NotificationBoxApp(
                         onContinueWithoutPermission = vm::completeOnboarding
                     )
                 }
-                else -> Phase1NotificationBoxScreen(vm)
+                else -> Phase1NotificationBoxScreen(vm, summaryVm)
             }
         }
     }

@@ -39,9 +39,13 @@ import com.notificationbox.app.domain.dryrun.OrganizationMode
 import com.notificationbox.app.domain.dryrun.PlannedAction
 import com.notificationbox.app.domain.dryrun.toStatistics
 import com.notificationbox.app.model.DecisionSource
+import com.notificationbox.app.ui.summary.NotificationSummaryViewModel
 
 @Composable
-fun Phase1NotificationBoxScreen(vm: NotificationBoxViewModel) {
+fun Phase1NotificationBoxScreen(
+    vm: NotificationBoxViewModel,
+    summaryVm: NotificationSummaryViewModel
+) {
     val dryRunState by vm.dryRunState.collectAsStateWithLifecycle()
     var panelHeightPx by remember { mutableIntStateOf(0) }
     val panelHeight = with(LocalDensity.current) { panelHeightPx.toDp() }
@@ -52,7 +56,7 @@ fun Phase1NotificationBoxScreen(vm: NotificationBoxViewModel) {
                 .fillMaxSize()
                 .padding(bottom = panelHeight)
         ) {
-            NotificationBoxScreen(vm)
+            NotificationBoxScreen(vm, summaryVm)
         }
         DryRunPreviewPanel(
             state = dryRunState,

@@ -5,9 +5,11 @@ import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.model.NotificationSummary
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 class FakeNotificationRepository : NotificationRepository {
     private val items = MutableStateFlow<List<NotificationItem>>(emptyList())
@@ -30,6 +32,25 @@ class FakeNotificationRepository : NotificationRepository {
     override fun observeAppRules(): Flow<List<AppRule>> = rules
 
     override fun observeClassificationStats(): Flow<ClassificationStats> = stats
+
+    override fun observeSummarySince(since: Instant): Flow<NotificationSummary> =
+        items.map { notifications ->
+            val matching = notifications.filter { !it.postTime.isBefore(since) }
+            NotificationSummary(
+                totalCount = matching.size,
+                keepNowCount = matching.count {
+                    it.automaticDecision == NotificationDecision.KeepNow
+                },
+                holdForDigestCount = matching.count {
+                    it.automaticDecision == NotificationDecision.HoldForDigest
+                },
+                ignoreCount = matching.count {
+                    it.automaticDecision == NotificationDecision.Ignore
+                },
+                periodStart = since,
+                generatedAt = Instant.EPOCH
+            )
+        }
 
     override suspend fun upsert(notification: NotificationRecord) {
         items.value = upsertInto(items.value, notification)

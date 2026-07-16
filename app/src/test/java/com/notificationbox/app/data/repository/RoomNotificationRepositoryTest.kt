@@ -50,6 +50,41 @@ class RoomNotificationRepositoryTest {
     }
 
     @Test
+    fun `summary maps dao counts and timestamps`() = runTest {
+        repository.upsert(
+            record(
+                key = "keep",
+                postTimeMillis = nowMillis - 1_000,
+                category = NotificationDecision.KeepNow
+            )
+        )
+        repository.upsert(
+            record(
+                key = "ignore",
+                postTimeMillis = nowMillis - 2_000,
+                category = NotificationDecision.Ignore
+            )
+        )
+        repository.upsert(
+            record(
+                key = "old",
+                postTimeMillis = nowMillis - 100_000,
+                category = NotificationDecision.HoldForDigest
+            )
+        )
+        val periodStart = Instant.ofEpochMilli(nowMillis - 10_000)
+
+        val summary = repository.observeSummarySince(periodStart).first()
+
+        assertEquals(2, summary.totalCount)
+        assertEquals(1, summary.keepNowCount)
+        assertEquals(0, summary.holdForDigestCount)
+        assertEquals(1, summary.ignoreCount)
+        assertEquals(periodStart, summary.periodStart)
+        assertEquals(clock.instant(), summary.generatedAt)
+    }
+
+    @Test
     fun `reposting same key preserves pin and manual decision`() = runTest {
         repository.upsert(record(key = "same", title = "before"))
         repository.setPinned("same", true)

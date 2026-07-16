@@ -4,6 +4,8 @@ import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.model.NotificationSummary
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 data class NotificationRecord(
@@ -28,6 +30,8 @@ interface NotificationRepository {
     fun observeAppRules(): Flow<List<AppRule>>
 
     fun observeClassificationStats(): Flow<ClassificationStats>
+
+    fun observeSummarySince(since: Instant): Flow<NotificationSummary>
 
     suspend fun upsert(notification: NotificationRecord)
 

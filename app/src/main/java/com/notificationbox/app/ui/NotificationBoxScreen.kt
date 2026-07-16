@@ -67,6 +67,8 @@ import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.IngestionErrorCode
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.ui.summary.NotificationSummaryRoute
+import com.notificationbox.app.ui.summary.NotificationSummaryViewModel
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -75,12 +77,16 @@ import kotlinx.coroutines.withContext
 
 private enum class HomeSection {
     Notifications,
-    AppRules
+    AppRules,
+    Summary
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
+fun NotificationBoxScreen(
+    vm: NotificationBoxViewModel,
+    summaryVm: NotificationSummaryViewModel
+) {
     val context = LocalContext.current
     val state by vm.state.collectAsStateWithLifecycle()
     var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -246,6 +252,13 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         },
                         label = { Text("アプリ別ルール (${state.appRules.size})") }
                     )
+                    FilterChip(
+                        selected = selectedSection == HomeSection.Summary,
+                        onClick = {
+                            selectedSectionIndex = HomeSection.Summary.ordinal
+                        },
+                        label = { Text("サマリー") }
+                    )
                 }
             }
 
@@ -350,6 +363,12 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                                 }
                             )
                         }
+                    }
+                }
+
+                HomeSection.Summary -> {
+                    item {
+                        NotificationSummaryRoute(viewModel = summaryVm)
                     }
                 }
             }

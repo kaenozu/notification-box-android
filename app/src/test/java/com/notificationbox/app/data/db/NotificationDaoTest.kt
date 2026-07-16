@@ -64,6 +64,45 @@ class NotificationDaoTest {
     }
 
     @Test
+    fun `summary counts automatic categories since cutoff`() = runTest {
+        dao.upsert(
+            entity(
+                key = "keep",
+                postTimeMillis = 1_000,
+                category = "KeepNow"
+            )
+        )
+        dao.upsert(
+            entity(
+                key = "digest",
+                postTimeMillis = 1_100,
+                category = "HoldForDigest"
+            )
+        )
+        dao.upsert(
+            entity(
+                key = "ignore",
+                postTimeMillis = 1_200,
+                category = "Ignore"
+            )
+        )
+        dao.upsert(
+            entity(
+                key = "old",
+                postTimeMillis = 500,
+                category = "KeepNow"
+            )
+        )
+
+        val summary = dao.observeSummarySince(sinceMillis = 1_000).first()
+
+        assertEquals(3, summary.totalCount)
+        assertEquals(1, summary.keepNowCount)
+        assertEquals(1, summary.holdForDigestCount)
+        assertEquals(1, summary.ignoreCount)
+    }
+
+    @Test
     fun `manual decision can be set and cleared`() = runTest {
         dao.upsert(entity(key = "decision"))
 
@@ -154,7 +193,8 @@ class NotificationDaoTest {
         postTimeMillis: Long = 1_000,
         userDecision: String? = null,
         userPinned: Boolean = false,
-        isActive: Boolean = true
+        isActive: Boolean = true,
+        category: String = "HoldForDigest"
     ): NotificationEntity =
         NotificationEntity(
             key = key,
@@ -166,7 +206,7 @@ class NotificationDaoTest {
             notificationId = 1,
             tag = null,
             channelId = "channel",
-            category = "HoldForDigest",
+            category = category,
             reason = "test",
             userDecision = userDecision,
             userPinned = userPinned,
