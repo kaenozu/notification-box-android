@@ -55,17 +55,12 @@ class NotificationBoxViewModelTest {
     }
 
     @Test
-    fun `permission state keeps runtime and app setting independent`() = runTest {
+    fun `permission state reflects listener grant`() = runTest {
         fakeProvider.listenerGranted = true
-        fakeProvider.postNotificationsRuntimeGranted = true
-        fakeProvider.appNotificationsEnabled = false
 
         viewModel.refreshPermissions()
 
-        val state = viewModel.state.first()
-        assertEquals(true, state.notificationAccessGranted)
-        assertEquals(true, state.postNotificationsRuntimeGranted)
-        assertEquals(false, state.appNotificationsEnabled)
+        assertEquals(true, viewModel.state.first().notificationAccessGranted)
     }
 
     @Test
@@ -196,8 +191,6 @@ class NotificationBoxViewModelTest {
     @Test
     fun `provider is read only at initialization and explicit refresh`() = runTest {
         assertEquals(1, fakeProvider.listenerCallCount)
-        assertEquals(1, fakeProvider.runtimePermissionCallCount)
-        assertEquals(1, fakeProvider.appNotificationsCallCount)
         fakeProvider.resetCallCounts()
 
         fakeRepository.emit(listOf(item("notification-key")))
@@ -217,14 +210,10 @@ class NotificationBoxViewModelTest {
         advanceUntilIdle()
 
         assertEquals(0, fakeProvider.listenerCallCount)
-        assertEquals(0, fakeProvider.runtimePermissionCallCount)
-        assertEquals(0, fakeProvider.appNotificationsCallCount)
 
         viewModel.refreshPermissions()
 
         assertEquals(1, fakeProvider.listenerCallCount)
-        assertEquals(1, fakeProvider.runtimePermissionCallCount)
-        assertEquals(1, fakeProvider.appNotificationsCallCount)
     }
 
     @Test
