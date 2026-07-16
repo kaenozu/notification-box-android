@@ -1,6 +1,8 @@
 package com.notificationbox.app.service
 
 import android.content.ComponentName
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.notificationbox.app.App
@@ -13,12 +15,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class NotificationRelayService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val clock: Clock = Clock.systemUTC()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val reconciliationRequested = AtomicBoolean(false)
     private lateinit var commandQueue: NotificationCommandQueue
 
@@ -106,22 +108,32 @@ class NotificationRelayService : NotificationListenerService() {
     private fun requestSnapshotReconciliation() {
         if (!reconciliationRequested.compareAndSet(false, true)) return
 
-        serviceScope.launch {
-            runCatching {
-                requestUnbind()
-                delay(REBIND_DELAY_MILLIS)
-                requestRebind(
-                    ComponentName(
-                        this@NotificationRelayService,
-                        NotificationRelayService::class.java
-                    )
-                )
-            }.onFailure {
+        val componentName = ComponentName(
+            applicationContext,
+            NotificationRelayService::class.java
+        )
+        val rebind = Runnable {
+            try {
+                requestRebind(componentName)
+            } catch (_: Exception) {
                 reconciliationRequested.set(false)
                 NotificationIngestionHealthStore.recordFailure(
                     IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
                 )
             }
+        }
+
+        try {
+            check(mainHandler.postDelayed(rebind, REBIND_DELAY_MILLIS)) {
+                "Unable to schedule notification-listener rebind"
+            }
+            requestUnbind()
+        } catch (_: Exception) {
+            mainHandler.removeCallbacks(rebind)
+            reconciliationRequested.set(false)
+            NotificationIngestionHealthStore.recordFailure(
+                IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
+            )
         }
     }
 
