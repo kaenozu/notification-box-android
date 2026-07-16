@@ -5,12 +5,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
+import com.notificationbox.app.data.settings.AppSettings
 import com.notificationbox.app.data.settings.SettingsRepository
 import com.notificationbox.app.domain.dryrun.DryRunPlanner
 import com.notificationbox.app.domain.dryrun.DryRunPreview
 import com.notificationbox.app.domain.dryrun.OrganizationMode
 import com.notificationbox.app.model.AppMode
+import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.AppState
+import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationIngestionHealth
 import com.notificationbox.app.model.NotificationItem
@@ -27,6 +30,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class NotificationHistoryUiState(
+    val items: List<NotificationItem> = emptyList(),
+    val selectedFilter: NotificationDecision? = null,
+    val notificationAccessGranted: Boolean = false,
+    val ingestionHealth: NotificationIngestionHealth = NotificationIngestionHealth()
+)
+
+data class SettingsRulesUiState(
+    val settings: AppSettings = AppSettings(),
+    val appRules: List<AppRule> = emptyList(),
+    val classificationStats: ClassificationStats = ClassificationStats()
+)
 
 class NotificationBoxViewModel(
     private val permissionProvider: PermissionStatusProvider,
@@ -61,33 +77,58 @@ class NotificationBoxViewModel(
                 emptyList()
             )
 
-    private val storedState = combine(
+    val historyState: StateFlow<NotificationHistoryUiState> = combine(
+        notifications,
         settingsRepository.settings,
+        notificationAccessGranted,
         ingestionHealth
-    ) { settings, health ->
+    ) { items, settings, listenerGranted, health ->
+        NotificationHistoryUiState(
+            items = items,
+            selectedFilter = settings.selectedFilter,
+            notificationAccessGranted = listenerGranted,
+            ingestionHealth = health
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        NotificationHistoryUiState()
+    )
+
+    val settingsRulesState: StateFlow<SettingsRulesUiState> = combine(
+        settingsRepository.settings,
+        notificationRepository.observeAppRules(),
+        notificationRepository.observeClassificationStats()
+    ) { settings, appRules, stats ->
+        SettingsRulesUiState(
+            settings = settings,
+            appRules = appRules,
+            classificationStats = stats
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        SettingsRulesUiState()
+    )
+
+    /** Compatibility aggregate for onboarding and the Phase 1 preview surface. */
+    val state: StateFlow<AppState> = combine(
+        historyState,
+        settingsRulesState
+    ) { history, settingsRules ->
+        val settings = settingsRules.settings
         AppState(
             mode = settings.mode,
             preferencesLoaded = settings.preferencesLoaded,
             onboardingCompleted = settings.onboardingCompleted,
+            notificationAccessGranted = history.notificationAccessGranted,
             digestSchedule = settings.digestSchedule,
             pausedUntilText = settings.pausedUntilText,
-            selectedFilter = settings.selectedFilter,
-            ingestionHealth = health
-        )
-    }
-
-    val state: StateFlow<AppState> = combine(
-        storedState,
-        notifications,
-        notificationRepository.observeAppRules(),
-        notificationRepository.observeClassificationStats(),
-        notificationAccessGranted
-    ) { storeState, notificationItems, appRules, stats, listenerGranted ->
-        storeState.copy(
-            notificationAccessGranted = listenerGranted,
-            items = notificationItems,
-            appRules = appRules,
-            classificationStats = stats
+            items = history.items,
+            appRules = settingsRules.appRules,
+            classificationStats = settingsRules.classificationStats,
+            ingestionHealth = history.ingestionHealth,
+            selectedFilter = history.selectedFilter
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppState())
 
