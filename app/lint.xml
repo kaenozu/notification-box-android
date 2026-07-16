@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <lint>
     <!--
-      AppIcon assigns produceState.value after switching to Dispatchers.IO.
-      The detector does not follow the assignment through withContext, so suppress
-      this single issue for the only file containing that verified pattern.
-    -->
-    <issue id="ProduceStateDoesNotAssignValue">
-        <ignore path="src/main/java/com/notificationbox/app/ui/NotificationBoxScreen.kt" />
-    </issue>
-
-    <!--
       Dependencies are intentionally held at the exact versions covered by the
       Windows/Linux/Room migration gates. Dependabot reports upgrades separately;
       library modernization is not mixed into a release-candidate hardening change.
