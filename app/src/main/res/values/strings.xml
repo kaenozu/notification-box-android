@@ -3,6 +3,9 @@
     <string name="notification_listener_label">通知箱の通知アクセス</string>
     <string name="notification_reason_app_rule">%1$sを「%2$s」に設定済み</string>
     <string name="notification_reason_user_override">ユーザーがこの通知を「%1$s」に変更</string>
+    <string name="notification_content_empty_title">内容なし</string>
+    <string name="notification_content_unavailable_title">内容を取得できません</string>
+    <string name="notification_content_unavailable_body">Androidまたは通知元アプリにより通知内容が非公開です。</string>
     <string name="dry_run_preview_title">整理プレビュー（非実行）</string>
     <string name="dry_run_preview_active_count_short">表示中の通知 %1$d件を端末内で試算</string>
     <string name="dry_run_mode_observe">観察のみ</string>
