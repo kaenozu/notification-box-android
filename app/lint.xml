@@ -17,10 +17,10 @@
     <issue id="GradleDependency" severity="ignore" />
 
     <!--
-      Room 2.8.4 with the repository's Kotlin 2.0.21 toolchain fails under the
-      matching KSP plugin because of a kotlinx.serialization binary incompatibility.
-      The established KAPT path is retained for v0.1.0 and covered by exact CI and
-      migration gates. KSP migration requires a separate coordinated dependency PR.
+      AGP 9 built-in Kotlin is enabled. Room remains on the official
+      com.android.legacy-kapt compatibility path for this release because a KSP
+      migration changes the compiler pipeline and requires an independent migration PR.
+      Exact Linux, Windows, Room-schema, and installed-APK gates cover this exception.
     -->
     <issue id="KaptUsageInsteadOfKsp" severity="ignore" />
 </lint>
