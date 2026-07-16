@@ -54,7 +54,8 @@ interface NotificationDao {
         DELETE FROM notifications
         WHERE userPinned = 0
           AND isActive = 0
-          AND postTimeMillis < :cutoffMillis
+          AND removedAtMillis IS NOT NULL
+          AND removedAtMillis < :cutoffMillis
         """
     )
     suspend fun deleteExpired(cutoffMillis: Long): Int
