@@ -23,7 +23,7 @@ fun NotificationBoxApp(
     factory: NotificationBoxViewModelFactory,
     vm: NotificationBoxViewModel = viewModel(factory = factory)
 ) {
-    val state by vm.state.collectAsStateWithLifecycle()
+    val settingsRules by vm.settingsRulesState.collectAsStateWithLifecycle()
     val operationMessage by vm.operationMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -37,8 +37,9 @@ fun NotificationBoxApp(
     NotificationBoxTheme {
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(modifier = Modifier.fillMaxSize()) {
+                val settings = settingsRules.settings
                 when {
-                    !state.preferencesLoaded -> {
+                    !settings.preferencesLoaded -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -46,12 +47,14 @@ fun NotificationBoxApp(
                             CircularProgressIndicator()
                         }
                     }
-                    !state.onboardingCompleted -> {
+
+                    !settings.onboardingCompleted -> {
                         OnboardingScreen(
                             onComplete = vm::completeOnboarding,
                             onContinueWithoutPermission = vm::completeOnboarding
                         )
                     }
+
                     else -> Phase1NotificationBoxScreen(vm)
                 }
             }
