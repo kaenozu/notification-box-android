@@ -7,6 +7,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.notificationbox.app.R
 import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.IngestionErrorCode
@@ -41,7 +42,7 @@ internal fun PrivacyInfoDialog(
         onDismissRequest = onDismiss,
         title = { Text("データと安全性") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.dp(10f))) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("通知の送信元、タイトル、本文、時刻、分類結果を端末内だけに保存します。")
                 Text("外部APIやクラウドへ送信せず、Androidバックアップも無効です。")
                 Text("非アクティブでピン留めされていない7日超の履歴を整理し、履歴は原則500件を上限とします。")
