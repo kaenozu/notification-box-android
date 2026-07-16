@@ -4,6 +4,8 @@ import android.service.notification.StatusBarNotification
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.domain.NotificationClassifier
 import com.notificationbox.app.domain.NotificationSample
+import com.notificationbox.app.model.NotificationContentAvailability
+import com.notificationbox.app.model.NotificationDecision
 
 class NotificationRecordFactory(
     private val ownPackageName: String,
@@ -14,12 +16,23 @@ class NotificationRecordFactory(
         if (sbn.packageName == ownPackageName) return null
 
         val extracted = NotificationTextExtractor.extract(sbn.notification)
-        val sample = NotificationSample(
-            packageName = sbn.packageName,
-            title = extracted.title,
-            text = extracted.text
-        )
-        val (decision, reason) = classifier.classify(sample)
+        val (decision, reason) = when (extracted.availability) {
+            NotificationContentAvailability.AVAILABLE -> classifier.classify(
+                NotificationSample(
+                    packageName = sbn.packageName,
+                    title = extracted.title,
+                    text = extracted.text
+                )
+            )
+
+            NotificationContentAvailability.EMPTY ->
+                NotificationDecision.HoldForDigest to
+                    "通知内容が空のため安全側で「あとで確認」に分類"
+
+            NotificationContentAvailability.REDACTED_OR_UNAVAILABLE ->
+                NotificationDecision.HoldForDigest to
+                    "通知内容を取得できないため安全側で「あとで確認」に分類"
+        }
 
         return NotificationRecord(
             key = sbn.key,
@@ -33,6 +46,7 @@ class NotificationRecordFactory(
             channelId = sbn.notification.channelId,
             category = decision,
             reason = reason,
+            contentAvailability = extracted.availability,
             isActive = true,
             removedAtMillis = null
         )
