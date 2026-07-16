@@ -98,7 +98,7 @@ class NotificationCommandProcessorTest {
 
         assertEquals(1, reconciliationRequests)
         assertEquals(1L, health.health.value.failedCommands)
-        assertEquals(IngestionErrorCode.COMMAND_QUEUE_OVERFLOW, health.health.value.lastError)
+        assertEquals(IngestionErrorCode.REPOSITORY_OPERATION_FAILED, health.health.value.lastError)
 
         release.complete(Unit)
         advanceUntilIdle()
