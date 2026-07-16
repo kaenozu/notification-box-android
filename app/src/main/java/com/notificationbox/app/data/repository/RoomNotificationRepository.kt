@@ -226,24 +226,13 @@ class RoomNotificationRepository(
             ruleDecision != null -> DecisionSource.AppRule
             else -> DecisionSource.Automatic
         }
-        val availability = contentAvailability.toContentAvailability()
 
         return NotificationItem(
             key = key,
             packageName = packageName,
             appLabel = appLabel,
-            title = when (availability) {
-                NotificationContentAvailability.AVAILABLE -> title
-                NotificationContentAvailability.EMPTY -> title ?: "内容なし"
-                NotificationContentAvailability.REDACTED_OR_UNAVAILABLE ->
-                    "内容を取得できません"
-            },
-            text = when (availability) {
-                NotificationContentAvailability.AVAILABLE -> text
-                NotificationContentAvailability.EMPTY -> null
-                NotificationContentAvailability.REDACTED_OR_UNAVAILABLE ->
-                    "Androidまたは通知元アプリにより通知内容が非公開です。"
-            },
+            title = title,
+            text = text,
             postTime = Instant.ofEpochMilli(postTimeMillis),
             automaticDecision = automaticDecision,
             userDecision = userOverride,
@@ -252,7 +241,7 @@ class RoomNotificationRepository(
             decisionSource = source,
             automaticReason = reason,
             reason = reason,
-            contentAvailability = availability,
+            contentAvailability = contentAvailability.toContentAvailability(),
             userPinned = userPinned,
             isActive = isActive,
             removedAt = removedAtMillis?.let(Instant::ofEpochMilli)
