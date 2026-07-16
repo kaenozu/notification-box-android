@@ -33,7 +33,7 @@ class NotificationDatabaseMigrationInstrumentedTest {
     }
 
     @Test
-    fun migrationOneToTwoPreservesDataAndValidatesSchema() {
+    fun migrationOneToThreePreservesDataAndValidatesSchema() {
         migrationHelper.createDatabase(databaseName, 1).apply {
             execSQL(
                 """
@@ -52,15 +52,16 @@ class NotificationDatabaseMigrationInstrumentedTest {
 
         val migrated = migrationHelper.runMigrationsAndValidate(
             databaseName,
-            2,
+            3,
             true,
-            NotificationDatabase.MIGRATION_1_2
+            NotificationDatabase.MIGRATION_1_2,
+            NotificationDatabase.MIGRATION_2_3
         )
 
         try {
             migrated.query(
                 """
-                SELECT `key`, title, text, userPinned, userDecision
+                SELECT `key`, title, text, userPinned, userDecision, contentAvailability
                 FROM notifications
                 WHERE `key` = 'existing'
                 """.trimIndent()
@@ -71,6 +72,10 @@ class NotificationDatabaseMigrationInstrumentedTest {
                 assertEquals("Text", cursor.getString(cursor.getColumnIndexOrThrow("text")))
                 assertEquals(1, cursor.getInt(cursor.getColumnIndexOrThrow("userPinned")))
                 assertNull(cursor.getString(cursor.getColumnIndexOrThrow("userDecision")))
+                assertEquals(
+                    "AVAILABLE",
+                    cursor.getString(cursor.getColumnIndexOrThrow("contentAvailability"))
+                )
                 assertFalse(cursor.moveToNext())
             }
 
