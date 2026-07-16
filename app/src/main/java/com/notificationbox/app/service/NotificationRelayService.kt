@@ -119,7 +119,7 @@ class NotificationRelayService : NotificationListenerService() {
             }.onFailure {
                 reconciliationRequested.set(false)
                 NotificationIngestionHealthStore.recordFailure(
-                    IngestionErrorCode.RECONCILIATION_REQUEST_FAILED
+                    IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
                 )
             }
         }
