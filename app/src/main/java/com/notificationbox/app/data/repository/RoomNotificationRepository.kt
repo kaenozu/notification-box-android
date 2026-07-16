@@ -5,9 +5,9 @@ import com.notificationbox.app.data.db.AppRuleEntity
 import com.notificationbox.app.data.db.ClassificationStatEntity
 import com.notificationbox.app.data.db.NotificationDatabase
 import com.notificationbox.app.data.db.NotificationEntity
+import com.notificationbox.app.domain.classification.EffectiveClassificationResolver
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.ClassificationStats
-import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.NotificationContentAvailability
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
@@ -24,7 +24,9 @@ import kotlinx.coroutines.sync.withLock
 
 class RoomNotificationRepository(
     private val database: NotificationDatabase,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val classificationResolver: EffectiveClassificationResolver =
+        EffectiveClassificationResolver()
 ) : NotificationRepository {
     private val notificationDao = database.notificationDao()
     private val appRuleDao = database.appRuleDao()
@@ -220,12 +222,11 @@ class RoomNotificationRepository(
         val automaticDecision = category.toDecisionOrDefault()
         val userOverride = userDecision.toDecisionOrNull()
         val ruleDecision = appRule?.decision.toDecisionOrNull()
-        val finalDecision = userOverride ?: ruleDecision ?: automaticDecision
-        val source = when {
-            userOverride != null -> DecisionSource.UserOverride
-            ruleDecision != null -> DecisionSource.AppRule
-            else -> DecisionSource.Automatic
-        }
+        val effective = classificationResolver.resolve(
+            automaticDecision = automaticDecision,
+            appRuleDecision = ruleDecision,
+            userDecision = userOverride
+        )
 
         return NotificationItem(
             key = key,
@@ -237,8 +238,8 @@ class RoomNotificationRepository(
             automaticDecision = automaticDecision,
             userDecision = userOverride,
             appRuleDecision = ruleDecision,
-            category = finalDecision,
-            decisionSource = source,
+            category = effective.decision,
+            decisionSource = effective.source,
             automaticReason = reason,
             reason = reason,
             contentAvailability = contentAvailability.toContentAvailability(),
