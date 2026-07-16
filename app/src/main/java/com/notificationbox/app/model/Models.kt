@@ -19,6 +19,12 @@ enum class AppMode {
     Active
 }
 
+enum class NotificationContentAvailability {
+    AVAILABLE,
+    EMPTY,
+    REDACTED_OR_UNAVAILABLE
+}
+
 data class NotificationItem(
     val key: String,
     val packageName: String,
@@ -33,6 +39,8 @@ data class NotificationItem(
     val decisionSource: DecisionSource,
     val automaticReason: String,
     val reason: String,
+    val contentAvailability: NotificationContentAvailability =
+        NotificationContentAvailability.AVAILABLE,
     val userPinned: Boolean = false,
     val isActive: Boolean = true,
     val removedAt: Instant? = null
@@ -63,8 +71,6 @@ data class AppState(
     val preferencesLoaded: Boolean = false,
     val onboardingCompleted: Boolean = false,
     val notificationAccessGranted: Boolean = false,
-    val postNotificationsRuntimeGranted: Boolean = false,
-    val appNotificationsEnabled: Boolean = false,
     val digestSchedule: DigestSchedule = DigestSchedule(),
     val pausedUntilText: String = "解除まで",
     val items: List<NotificationItem> = emptyList(),
