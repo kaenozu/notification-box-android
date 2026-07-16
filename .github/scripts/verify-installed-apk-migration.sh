@@ -2,18 +2,18 @@
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <v1-apk> <v2-apk>" >&2
+  echo "Usage: $0 <v1-apk> <current-apk>" >&2
   exit 2
 fi
 
 V1_APK="$1"
-V2_APK="$2"
+CURRENT_APK="$2"
 APP_ID="com.notificationbox.app"
 ACTIVITY="$APP_ID/.MainActivity"
 DB_NAME="notification-box.db"
 REPORT_DIR="installed-apk-migration-report"
 SEED_DB="$REPORT_DIR/v1-seeded.db"
-MIGRATED_DB="$REPORT_DIR/v2-migrated.db"
+MIGRATED_DB="$REPORT_DIR/current-migrated.db"
 LOGCAT_FILE="$REPORT_DIR/logcat.txt"
 RESULT_FILE="$REPORT_DIR/result.txt"
 
@@ -26,7 +26,7 @@ record() {
 
 record "Installed APK migration validation"
 record "v1 APK: $V1_APK"
-record "v2 APK: $V2_APK"
+record "current APK: $CURRENT_APK"
 record "device: $(adb shell getprop ro.product.manufacturer | tr -d '\r') $(adb shell getprop ro.product.model | tr -d '\r')"
 record "android: $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"
 
@@ -109,18 +109,18 @@ adb shell chmod 0644 "/data/local/tmp/$DB_NAME"
 adb shell run-as "$APP_ID" cp "/data/local/tmp/$DB_NAME" "databases/$DB_NAME"
 adb shell rm -f "/data/local/tmp/$DB_NAME"
 
-adb install -r "$V2_APK" | tee "$REPORT_DIR/install-v2.txt"
+adb install -r "$CURRENT_APK" | tee "$REPORT_DIR/install-current.txt"
 adb logcat -c
-adb shell am start -W -n "$ACTIVITY" | tee "$REPORT_DIR/launch-v2.txt"
+adb shell am start -W -n "$ACTIVITY" | tee "$REPORT_DIR/launch-current.txt"
 sleep 3
 
 PID="$(adb shell pidof "$APP_ID" | tr -d '\r')"
 if [ -z "$PID" ]; then
   adb logcat -d > "$LOGCAT_FILE"
-  record "FAIL: v2 process is not running after launch"
+  record "FAIL: current process is not running after launch"
   exit 1
 fi
-record "v2 process: $PID"
+record "current process: $PID"
 
 adb shell am force-stop "$APP_ID"
 adb logcat -d > "$LOGCAT_FILE"
@@ -135,12 +135,13 @@ connection = sqlite3.connect(path)
 connection.row_factory = sqlite3.Row
 try:
     user_version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if user_version != 2:
-        raise AssertionError(f"expected user_version 2, got {user_version}")
+    if user_version != 3:
+        raise AssertionError(f"expected user_version 3, got {user_version}")
 
     row = connection.execute(
         """
-        SELECT `key`, packageName, title, text, userPinned, userDecision
+        SELECT `key`, packageName, title, text, userPinned, userDecision,
+               contentAvailability
         FROM notifications
         WHERE `key` = 'installed-upgrade-existing'
         """
@@ -157,6 +158,8 @@ try:
         raise AssertionError("pin state was not preserved")
     if row["userDecision"] is not None:
         raise AssertionError("existing notification userDecision is not NULL")
+    if row["contentAvailability"] != "AVAILABLE":
+        raise AssertionError("existing content availability did not default to AVAILABLE")
 
     tables = {
         item[0]
@@ -192,10 +195,11 @@ try:
         raise AssertionError("classification_stats write validation failed")
 
     with open(result_path, "a", encoding="utf-8") as output:
-        output.write("PASS: database user_version is 2\n")
+        output.write("PASS: database user_version is 3\n")
         output.write("PASS: installed v1 notification data preserved\n")
         output.write("PASS: installed v1 pin state preserved\n")
         output.write("PASS: existing userDecision is NULL\n")
+        output.write("PASS: existing contentAvailability is AVAILABLE\n")
         output.write("PASS: app_rules table is writable\n")
         output.write("PASS: classification_stats table is writable\n")
 finally:
@@ -207,4 +211,4 @@ if grep -E "FATAL EXCEPTION|Room cannot verify|IllegalStateException:.*migration
   exit 1
 fi
 
-record "PASS: v1 APK to v2 APK overwrite migration completed"
+record "PASS: v1 APK to current APK overwrite migration completed"
