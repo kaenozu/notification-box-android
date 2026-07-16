@@ -281,7 +281,7 @@ internal fun EmptyNotificationsCard(
 }
 
 @Composable
-private fun AppIcon(packageName: String, appLabel: String) {
+internal fun AppIcon(packageName: String, appLabel: String) {
     val context = LocalContext.current
     val bitmap by produceState<ImageBitmap?>(initialValue = null, packageName) {
         value = withContext(Dispatchers.IO) {
