@@ -30,11 +30,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.notificationbox.app.R
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
@@ -78,8 +80,8 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
-            title = { Text("通知履歴をすべて削除しますか？") },
-            text = { Text("ピン留めを含む端末内の履歴が削除されます。アプリ別ルールは残ります。") },
+            title = { Text(stringResource(R.string.notification_clear_all_title)) },
+            text = { Text(stringResource(R.string.notification_clear_all_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -87,12 +89,12 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         vm.clearAll()
                     }
                 ) {
-                    Text("削除")
+                    Text(stringResource(R.string.common_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirmation = false }) {
-                    Text("キャンセル")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )
@@ -101,8 +103,8 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     if (showStatsResetConfirmation) {
         AlertDialog(
             onDismissRequest = { showStatsResetConfirmation = false },
-            title = { Text("分類統計をリセットしますか？") },
-            text = { Text("分類件数と補正操作の集計だけを削除します。通知履歴とアプリ別ルールは残ります。") },
+            title = { Text(stringResource(R.string.notification_stats_reset_title)) },
+            text = { Text(stringResource(R.string.notification_stats_reset_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -110,12 +112,12 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         vm.resetClassificationStats()
                     }
                 ) {
-                    Text("リセット")
+                    Text(stringResource(R.string.common_reset))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showStatsResetConfirmation = false }) {
-                    Text("キャンセル")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )
@@ -124,8 +126,15 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     deleteTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text("この履歴を削除しますか？") },
-            text = { Text("「${target.appLabel}」のこの通知履歴だけを端末内から削除します。元のOS通知は変更しません。") },
+            title = { Text(stringResource(R.string.notification_delete_one_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.notification_delete_one_body,
+                        target.appLabel
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -133,12 +142,12 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         deleteTarget = null
                     }
                 ) {
-                    Text("削除")
+                    Text(stringResource(R.string.common_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteTarget = null }) {
-                    Text("キャンセル")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )
@@ -168,10 +177,15 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("通知箱") },
+                title = { Text(stringResource(R.string.notification_screen_title)) },
                 actions = {
                     IconButton(onClick = { showPrivacyInfo = true }) {
-                        Icon(Icons.Filled.Info, contentDescription = "データと安全性")
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = stringResource(
+                                R.string.notification_data_safety
+                            )
+                        )
                     }
                 }
             )
@@ -208,14 +222,28 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         onClick = {
                             selectedSectionIndex = HomeSection.Notifications.ordinal
                         },
-                        label = { Text("通知履歴 (${history.items.size})") }
+                        label = {
+                            Text(
+                                stringResource(
+                                    R.string.notification_tab_history,
+                                    history.items.size
+                                )
+                            )
+                        }
                     )
                     FilterChip(
                         selected = selectedSection == HomeSection.AppRules,
                         onClick = {
                             selectedSectionIndex = HomeSection.AppRules.ordinal
                         },
-                        label = { Text("アプリ別ルール (${settingsRules.appRules.size})") }
+                        label = {
+                            Text(
+                                stringResource(
+                                    R.string.notification_tab_app_rules,
+                                    settingsRules.appRules.size
+                                )
+                            )
+                        }
                     )
                 }
             }
@@ -230,7 +258,7 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                             FilterChip(
                                 selected = history.selectedFilter == null,
                                 onClick = { vm.setFilter(null) },
-                                label = { Text("すべて") }
+                                label = { Text(stringResource(R.string.common_all)) }
                             )
                             NotificationDecision.entries.forEach { decision ->
                                 FilterChip(
