@@ -16,6 +16,7 @@ class MainActivity : ComponentActivity() {
         val factory = NotificationBoxViewModelFactory(
             permissionProvider = container.permissionStatusProvider,
             notificationRepository = container.notificationRepository,
+            settingsRepository = container.settingsRepository,
             notificationContentPresenter = container.notificationContentPresenter
         )
         setContent {
