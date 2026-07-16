@@ -91,6 +91,26 @@ class RoomNotificationRepositoryHardeningTest {
     }
 
     @Test
+    fun `classification statistics preserve automatic override and rule counts`() = runTest {
+        repository.upsert(record("one"))
+        repository.setNotificationDecision("one", NotificationDecision.Ignore)
+        repository.setAppRule(
+            packageName = "com.example.app",
+            appLabel = "Example",
+            decision = NotificationDecision.HoldForDigest
+        )
+
+        val stats = repository.observeClassificationStats().first()
+        assertEquals(1L, stats.automaticallyClassified)
+        assertEquals(1L, stats.userOverrideChanges)
+        assertEquals(1L, stats.appRuleChanges)
+        assertEquals(1L, stats.automaticByDecision[NotificationDecision.KeepNow])
+        assertEquals(1L, stats.selectedByDecision[NotificationDecision.Ignore])
+        assertEquals(1L, stats.selectedByDecision[NotificationDecision.HoldForDigest])
+        assertEquals(2L, stats.appChangeCounts["com.example.app"])
+    }
+
+    @Test
     fun `reset classification statistics clears aggregate decision and application keys`() = runTest {
         repository.upsert(record("one"))
         repository.setNotificationDecision("one", NotificationDecision.Ignore)
