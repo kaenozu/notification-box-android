@@ -38,10 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.notificationbox.app.BuildConfig
+import com.notificationbox.app.R
 import com.notificationbox.app.model.IngestionErrorCode
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
@@ -69,13 +71,18 @@ internal fun StatusCard(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("通知を端末内で整理", style = MaterialTheme.typography.titleLarge)
             Text(
-                if (notificationAccessGranted) {
-                    "通知アクセスは許可済みです。届いた通知を端末内の履歴へ反映します。"
-                } else {
-                    "通知アクセスが未許可です。許可するまで通知内容は読み取りません。"
-                }
+                stringResource(R.string.notification_status_title),
+                style = MaterialTheme.typography.titleLarge
+            )
+            Text(
+                stringResource(
+                    if (notificationAccessGranted) {
+                        R.string.notification_access_granted_body
+                    } else {
+                        R.string.notification_access_missing_body
+                    }
+                )
             )
             Text(
                 ingestionHealthText(processed, failed, lastError),
@@ -86,13 +93,23 @@ internal fun StatusCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = onOpenListenerSettings) {
-                    Text(if (notificationAccessGranted) "通知アクセスを確認" else "通知アクセスを設定")
+                    Text(
+                        stringResource(
+                            if (notificationAccessGranted) {
+                                R.string.notification_access_check
+                            } else {
+                                R.string.notification_access_setup
+                            }
+                        )
+                    )
                 }
                 if (BuildConfig.DEBUG) {
-                    Button(onClick = onSeed) { Text("デモ追加") }
+                    Button(onClick = onSeed) {
+                        Text(stringResource(R.string.notification_demo_add))
+                    }
                 }
                 TextButton(onClick = onClearAll, enabled = hasItems) {
-                    Text("履歴をすべて削除")
+                    Text(stringResource(R.string.notification_clear_all_action))
                 }
             }
         }
@@ -110,10 +127,12 @@ internal fun SafetyNoticeCard() {
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text("安全な観察・試算版", style = MaterialTheme.typography.titleMedium)
             Text(
-                "このバージョンは元のOS通知を削除、抑制、スヌーズ、遅延しません。" +
-                    "分類と整理プレビューだけを行います。",
+                stringResource(R.string.notification_safety_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                stringResource(R.string.notification_safety_body),
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -152,7 +171,7 @@ internal fun NotificationCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        item.title ?: "タイトルなし",
+                        item.title ?: stringResource(R.string.notification_title_missing),
                         style = MaterialTheme.typography.bodyLarge,
                         maxLines = if (expanded) 4 else 2,
                         overflow = TextOverflow.Ellipsis
@@ -162,12 +181,20 @@ internal fun NotificationCard(
                     Icon(
                         imageVector =
                             if (item.userPinned) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription =
-                            if (item.userPinned) "ピン留めを解除" else "ピン留め"
+                        contentDescription = stringResource(
+                            if (item.userPinned) {
+                                R.string.notification_unpin
+                            } else {
+                                R.string.notification_pin
+                            }
+                        )
                     )
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.DeleteOutline, contentDescription = "履歴から削除")
+                    Icon(
+                        Icons.Filled.DeleteOutline,
+                        contentDescription = stringResource(R.string.notification_delete_history)
+                    )
                 }
             }
             item.text?.let { body ->
@@ -189,10 +216,23 @@ internal fun NotificationCard(
                 AssistChip(
                     onClick = {},
                     enabled = false,
-                    label = { Text(if (item.isActive) "端末に表示中" else "通知終了済み") }
+                    label = {
+                        Text(
+                            stringResource(
+                                if (item.isActive) {
+                                    R.string.notification_active
+                                } else {
+                                    R.string.notification_removed
+                                }
+                            )
+                        )
+                    }
                 )
             }
-            Text("この通知の分類", style = MaterialTheme.typography.labelLarge)
+            Text(
+                stringResource(R.string.notification_classification_heading),
+                style = MaterialTheme.typography.labelLarge
+            )
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -206,7 +246,7 @@ internal fun NotificationCard(
                 }
             }
             Text(
-                "選択中の分類をもう一度押すと、この通知だけ自動分類へ戻ります。",
+                stringResource(R.string.notification_classification_toggle_hint),
                 style = MaterialTheme.typography.bodySmall
             )
             FlowRow(
@@ -214,25 +254,40 @@ internal fun NotificationCard(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 TextButton(onClick = onEditAppRule) {
-                    Text("このアプリのルールを設定")
+                    Text(stringResource(R.string.notification_edit_app_rule))
                 }
                 TextButton(onClick = { expanded = !expanded }) {
                     Icon(
                         if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                         contentDescription = null
                     )
-                    Text(if (expanded) "詳細を閉じる" else "判定の詳細")
+                    Text(
+                        stringResource(
+                            if (expanded) {
+                                R.string.notification_detail_close
+                            } else {
+                                R.string.notification_detail_open
+                            }
+                        )
+                    )
                 }
             }
             if (expanded) {
                 HorizontalDivider()
                 Text(item.displayReason())
                 Text(
-                    "判定元: ${item.decisionSource.displayName()}",
+                    stringResource(
+                        R.string.notification_decision_source,
+                        item.decisionSource.displayName()
+                    ),
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    "自動分類: ${item.automaticDecision.displayName()} — ${item.automaticReason}",
+                    stringResource(
+                        R.string.notification_automatic_result,
+                        item.automaticDecision.displayName(),
+                        item.automaticReason
+                    ),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -259,22 +314,30 @@ internal fun EmptyNotificationsCard(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (!hasAnyNotifications) {
-                Text("通知履歴はまだありません", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    if (notificationAccessGranted) {
-                        "通知が届くと、ここに端末内の分類履歴が表示されます。"
-                    } else {
-                        "通知アクセスを許可すると、以降に届く通知を端末内で分類できます。"
-                    }
+                    stringResource(R.string.notification_empty_title),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    stringResource(
+                        if (notificationAccessGranted) {
+                            R.string.notification_empty_granted_body
+                        } else {
+                            R.string.notification_empty_missing_permission_body
+                        }
+                    )
                 )
                 if (!notificationAccessGranted) {
                     Button(onClick = onOpenListenerSettings) {
-                        Text("通知アクセスを設定")
+                        Text(stringResource(R.string.notification_access_setup))
                     }
                 }
             } else {
-                Text("この分類の通知はありません", style = MaterialTheme.typography.titleMedium)
-                Text("別の分類を選ぶと、保存済みの通知を確認できます。")
+                Text(
+                    stringResource(R.string.notification_filter_empty_title),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(stringResource(R.string.notification_filter_empty_body))
             }
         }
     }
@@ -293,12 +356,16 @@ internal fun AppIcon(packageName: String, appLabel: String) {
             }.getOrNull()
         }
     }
+    val contentDescription = stringResource(
+        R.string.notification_app_icon_description,
+        appLabel
+    )
 
     val loadedBitmap = bitmap
     if (loadedBitmap != null) {
         Image(
             bitmap = loadedBitmap,
-            contentDescription = "${appLabel}のアイコン",
+            contentDescription = contentDescription,
             modifier = Modifier
                 .size(40.dp)
                 .padding(end = 8.dp)
@@ -306,7 +373,7 @@ internal fun AppIcon(packageName: String, appLabel: String) {
     } else {
         Icon(
             imageVector = Icons.Filled.Notifications,
-            contentDescription = "${appLabel}のアイコン",
+            contentDescription = contentDescription,
             modifier = Modifier
                 .size(40.dp)
                 .padding(end = 8.dp)
