@@ -40,20 +40,24 @@ internal fun PrivacyInfoDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("データと安全性") },
+        title = { Text(stringResource(R.string.notification_data_safety)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("通知の送信元、タイトル、本文、時刻、分類結果を端末内だけに保存します。")
-                Text("外部APIやクラウドへ送信せず、Androidバックアップも無効です。")
-                Text("非アクティブでピン留めされていない7日超の履歴を整理し、履歴は原則500件を上限とします。")
-                Text("このバージョンは元のOS通知を変更しません。")
+                Text(stringResource(R.string.notification_privacy_storage))
+                Text(stringResource(R.string.notification_privacy_network))
+                Text(stringResource(R.string.notification_privacy_retention))
+                Text(stringResource(R.string.notification_privacy_os_boundary))
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("閉じる") }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_close))
+            }
         },
         dismissButton = {
-            TextButton(onClick = onShowOnboarding) { Text("初回説明を再表示") }
+            TextButton(onClick = onShowOnboarding) {
+                Text(stringResource(R.string.notification_show_onboarding))
+            }
         }
     )
 }
@@ -63,35 +67,49 @@ internal fun Instant.displayTimestamp(): String =
         .withZone(ZoneId.systemDefault())
         .format(this)
 
+@Composable
 internal fun ingestionHealthText(
     processed: Long,
     failed: Long,
     lastError: IngestionErrorCode?
 ): String =
     if (failed == 0L) {
-        "通知取込は正常です（処理済み ${processed}件）"
+        stringResource(R.string.notification_ingestion_healthy, processed)
     } else {
-        "通知取込で累計 ${failed}件の問題を検出しました。最終状態: " +
-            lastError.userMessage() +
-            "。通知内容は診断情報へ保存しません。"
+        stringResource(
+            R.string.notification_ingestion_failed,
+            failed,
+            lastError.userMessage()
+        )
     }
 
+@Composable
 private fun IngestionErrorCode?.userMessage(): String = when (this) {
-    IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED -> "現在の通知一覧を取得できませんでした"
-    IngestionErrorCode.RECORD_MAPPING_FAILED -> "一部の通知を読み取れませんでした"
-    IngestionErrorCode.REPOSITORY_OPERATION_FAILED -> "端末内への保存に失敗しました"
-    IngestionErrorCode.COMMAND_QUEUE_CLOSED -> "通知取込の終了処理中に新しい通知を受け取りました"
-    null -> "詳細不明"
+    IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED ->
+        stringResource(R.string.notification_error_snapshot)
+
+    IngestionErrorCode.RECORD_MAPPING_FAILED ->
+        stringResource(R.string.notification_error_mapping)
+
+    IngestionErrorCode.REPOSITORY_OPERATION_FAILED ->
+        stringResource(R.string.notification_error_repository)
+
+    IngestionErrorCode.COMMAND_QUEUE_CLOSED ->
+        stringResource(R.string.notification_error_queue_closed)
+
+    null -> stringResource(R.string.notification_error_unknown)
 }
 
+@Composable
 internal fun NotificationDecision.displayName(): String = when (this) {
-    NotificationDecision.KeepNow -> "優先"
-    NotificationDecision.HoldForDigest -> "あとで確認"
-    NotificationDecision.Ignore -> "低優先"
+    NotificationDecision.KeepNow -> stringResource(R.string.notification_decision_keep)
+    NotificationDecision.HoldForDigest -> stringResource(R.string.notification_decision_digest)
+    NotificationDecision.Ignore -> stringResource(R.string.notification_decision_ignore)
 }
 
+@Composable
 internal fun DecisionSource.displayName(): String = when (this) {
-    DecisionSource.Automatic -> "自動分類"
-    DecisionSource.AppRule -> "アプリ別ルール"
-    DecisionSource.UserOverride -> "この通知の手動指定"
+    DecisionSource.Automatic -> stringResource(R.string.notification_source_automatic)
+    DecisionSource.AppRule -> stringResource(R.string.notification_source_app_rule)
+    DecisionSource.UserOverride -> stringResource(R.string.notification_source_user_override)
 }
