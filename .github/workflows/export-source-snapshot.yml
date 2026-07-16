@@ -1,0 +1,32 @@
+name: Export Source Snapshot
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Create source archive
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude=.gradle \
+            --exclude='**/build' \
+            -czf "$RUNNER_TEMP/notification-box-source.tar.gz" .
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: notification-box-source
+          path: ${{ runner.temp }}/notification-box-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
