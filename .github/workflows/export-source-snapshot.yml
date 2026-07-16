@@ -1,12 +1,19 @@
 name: Apply Notification Summary MVP
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - agent/notification-summary-mvp
 
 permissions:
   contents: write
+
+concurrency:
+  group: apply-notification-summary-mvp
+  cancel-in-progress: true
 
 jobs:
   apply-and-validate:
@@ -16,6 +23,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
+          ref: agent/notification-summary-mvp
 
       - name: Apply implementation patch
         run: |
