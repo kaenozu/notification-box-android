@@ -28,7 +28,7 @@ data class NotificationEntity(
     val category: String,
     val reason: String,
     val userDecision: String?,
-    @ColumnInfo(defaultValue = "AVAILABLE")
+    @ColumnInfo(defaultValue = "'AVAILABLE'")
     val contentAvailability: String = NotificationContentAvailability.AVAILABLE.name,
     val userPinned: Boolean,
     val isActive: Boolean,
