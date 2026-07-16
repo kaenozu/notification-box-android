@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AppRuleEntity::class,
         ClassificationStatEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class NotificationDatabase : RoomDatabase() {
@@ -52,13 +52,22 @@ abstract class NotificationDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE notifications " +
+                        "ADD COLUMN contentAvailability TEXT NOT NULL DEFAULT 'AVAILABLE'"
+                )
+            }
+        }
+
         fun create(context: Context): NotificationDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 NotificationDatabase::class.java,
                 "notification-box.db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }
