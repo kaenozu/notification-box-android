@@ -8,7 +8,7 @@ This runbook defines the exact sequence for internal testing, closed testing, an
 - Package: `com.notificationbox.app`
 - Version name: `0.1.0`
 - Version code: `1`
-- Target SDK: Android 16 / API 36
+- Target SDK: Android 17 / API 37
 - OS notification cancellation, suppression, snooze, delay, and digest delivery: out of scope
 
 ## Gate 1: source candidate
@@ -88,7 +88,7 @@ Required checks include:
 - [ ] Notification history remains for seven days after the notification ends, unless explicitly deleted.
 - [ ] Rapid notification bursts recover through listener snapshot reconciliation without unbounded memory growth.
 - [ ] Screenshots, screen recording, and recents preview do not expose notification content.
-- [ ] Android 16/API 36 behavior is verified on at least one applicable device or pre-launch environment.
+- [ ] Android 17/API 37 behavior is verified on at least one applicable device or pre-launch environment.
 
 ## Gate 5: privacy and store configuration
 
