@@ -9,21 +9,26 @@ import com.notificationbox.app.data.repository.NotificationSummarySource
 import com.notificationbox.app.model.NotificationSummary
 import java.time.Clock
 import java.time.Duration
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class NotificationSummaryViewModel(
-    summarySource: NotificationSummarySource,
-    clock: Clock = Clock.systemUTC()
+    private val summarySource: NotificationSummarySource,
+    private val clock: Clock = Clock.systemUTC()
 ) : ViewModel() {
 
-    private val periodStart = clock.instant().minus(Duration.ofHours(24))
+    private val periodStart = MutableStateFlow(currentPeriodStart())
 
     val uiState: StateFlow<NotificationSummaryUiState> =
-        summarySource.observeSummarySince(periodStart)
+        periodStart
+            .flatMapLatest(summarySource::observeSummarySince)
             .map<NotificationSummary, NotificationSummaryUiState> { summary ->
                 if (summary.totalCount == 0) {
                     NotificationSummaryUiState.Empty
@@ -37,6 +42,12 @@ class NotificationSummaryViewModel(
                 SharingStarted.WhileSubscribed(5_000),
                 NotificationSummaryUiState.Loading
             )
+
+    fun refresh() {
+        periodStart.value = currentPeriodStart()
+    }
+
+    private fun currentPeriodStart() = clock.instant().minus(Duration.ofHours(24))
 }
 
 class NotificationSummaryViewModelFactory(
