@@ -248,7 +248,7 @@ jobs:
           retention-days: 14
 
   migration-gate:
-    if: always()
+    if: ${{ always() && !cancelled() }}
     needs:
       - detect-migration-changes
       - verify-room-migration
