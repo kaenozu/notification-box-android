@@ -4,12 +4,14 @@ import com.notificationbox.app.data.repository.NotificationSummarySource
 import com.notificationbox.app.model.NotificationSummary
 import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -89,6 +91,40 @@ class NotificationSummaryViewModelTest {
         collection.cancel()
     }
 
+    @Test
+    fun `refresh can recover after a source failure`() = runTest {
+        val clock = MutableClock(now)
+        var fail = true
+        val requestedPeriods = mutableListOf<Instant>()
+        val viewModel = NotificationSummaryViewModel(
+            summarySource = NotificationSummarySource { since ->
+                requestedPeriods += since
+                if (fail) {
+                    flow { throw IllegalStateException("temporary failure") }
+                } else {
+                    flowOf(summary(total = 1).copy(periodStart = since))
+                }
+            },
+            clock = clock
+        )
+        val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+        advanceUntilIdle()
+        assertEquals(NotificationSummaryUiState.Error, viewModel.uiState.value)
+
+        fail = false
+        clock.current = now.plusSeconds(60)
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is NotificationSummaryUiState.Content)
+        assertEquals(2, requestedPeriods.size)
+        assertEquals(now.minusSeconds(24 * 60 * 60), requestedPeriods.first())
+        assertEquals(now.plusSeconds(60).minusSeconds(24 * 60 * 60), requestedPeriods.last())
+        collection.cancel()
+    }
+
     private fun summary(total: Int) = NotificationSummary(
         totalCount = total,
         keepNowCount = total,
@@ -97,4 +133,12 @@ class NotificationSummaryViewModelTest {
         periodStart = now.minusSeconds(24 * 60 * 60),
         generatedAt = now
     )
+
+    private class MutableClock(var current: Instant) : Clock() {
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+
+        override fun withZone(zone: ZoneId): Clock = this
+
+        override fun instant(): Instant = current
+    }
 }

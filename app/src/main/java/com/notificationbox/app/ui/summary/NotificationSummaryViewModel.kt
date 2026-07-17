@@ -28,15 +28,17 @@ class NotificationSummaryViewModel(
 
     val uiState: StateFlow<NotificationSummaryUiState> =
         periodStart
-            .flatMapLatest(summarySource::observeSummarySince)
-            .map<NotificationSummary, NotificationSummaryUiState> { summary ->
-                if (summary.totalCount == 0) {
-                    NotificationSummaryUiState.Empty
-                } else {
-                    NotificationSummaryUiState.Content(summary)
-                }
+            .flatMapLatest { since ->
+                summarySource.observeSummarySince(since)
+                    .map<NotificationSummary, NotificationSummaryUiState> { summary ->
+                        if (summary.totalCount == 0) {
+                            NotificationSummaryUiState.Empty
+                        } else {
+                            NotificationSummaryUiState.Content(summary)
+                        }
+                    }
+                    .catch { emit(NotificationSummaryUiState.Error) }
             }
-            .catch { emit(NotificationSummaryUiState.Error) }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
