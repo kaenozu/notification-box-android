@@ -10,7 +10,6 @@ import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
 import com.notificationbox.app.model.IngestionErrorCode
 import java.time.Clock
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +20,6 @@ class NotificationRelayService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val clock: Clock = Clock.systemUTC()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val reconciliationRequested = AtomicBoolean(false)
     private lateinit var commandQueue: NotificationCommandQueue
 
     private val repository: NotificationRepository by lazy {
@@ -35,6 +33,27 @@ class NotificationRelayService : NotificationListenerService() {
         )
     }
 
+    private val rebindCoordinator: NotificationRebindCoordinator by lazy {
+        val componentName = ComponentName(
+            applicationContext,
+            NotificationRelayService::class.java
+        )
+        NotificationRebindCoordinator(
+            schedule = { runnable, delayMillis ->
+                mainHandler.postDelayed(runnable, delayMillis)
+            },
+            cancelScheduled = mainHandler::removeCallbacks,
+            requestUnbind = ::requestUnbind,
+            requestRebind = { requestRebind(componentName) },
+            recordFailure = {
+                NotificationIngestionHealthStore.recordFailure(
+                    IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
+                )
+            },
+            delayMillis = REBIND_DELAY_MILLIS
+        )
+    }
+
     override fun onCreate() {
         super.onCreate()
         val reporter = NotificationIngestionHealthStore
@@ -42,13 +61,13 @@ class NotificationRelayService : NotificationListenerService() {
             scope = serviceScope,
             processor = NotificationCommandProcessor(repository, reporter),
             healthReporter = reporter,
-            onOverflow = ::requestSnapshotReconciliation
+            onOverflow = rebindCoordinator::request
         )
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        reconciliationRequested.set(false)
+        rebindCoordinator.markConnected()
         synchronizeCurrentNotifications()
     }
 
@@ -103,38 +122,6 @@ class NotificationRelayService : NotificationListenerService() {
                 synchronizedAtMillis = clock.millis()
             )
         )
-    }
-
-    private fun requestSnapshotReconciliation() {
-        if (!reconciliationRequested.compareAndSet(false, true)) return
-
-        val componentName = ComponentName(
-            applicationContext,
-            NotificationRelayService::class.java
-        )
-        val rebind = Runnable {
-            try {
-                requestRebind(componentName)
-            } catch (_: Exception) {
-                reconciliationRequested.set(false)
-                NotificationIngestionHealthStore.recordFailure(
-                    IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
-                )
-            }
-        }
-
-        try {
-            check(mainHandler.postDelayed(rebind, REBIND_DELAY_MILLIS)) {
-                "Unable to schedule notification-listener rebind"
-            }
-            requestUnbind()
-        } catch (_: Exception) {
-            mainHandler.removeCallbacks(rebind)
-            reconciliationRequested.set(false)
-            NotificationIngestionHealthStore.recordFailure(
-                IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
-            )
-        }
     }
 
     private fun createRecordSafely(sbn: StatusBarNotification): NotificationRecord? {

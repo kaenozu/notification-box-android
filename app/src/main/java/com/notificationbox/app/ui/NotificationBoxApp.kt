@@ -16,12 +16,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.notificationbox.app.ui.summary.NotificationSummaryViewModel
+import com.notificationbox.app.ui.summary.NotificationSummaryViewModelFactory
 import com.notificationbox.app.ui.theme.NotificationBoxTheme
 
 @Composable
 fun NotificationBoxApp(
-    factory: NotificationBoxViewModelFactory,
-    vm: NotificationBoxViewModel = viewModel(factory = factory)
+    notificationFactory: NotificationBoxViewModelFactory,
+    summaryFactory: NotificationSummaryViewModelFactory,
+    vm: NotificationBoxViewModel = viewModel(factory = notificationFactory),
+    summaryViewModel: NotificationSummaryViewModel = viewModel(factory = summaryFactory)
 ) {
     val settingsRules by vm.settingsRulesState.collectAsStateWithLifecycle()
     val operationMessage by vm.operationMessage.collectAsStateWithLifecycle()
@@ -55,7 +59,7 @@ fun NotificationBoxApp(
                         )
                     }
 
-                    else -> Phase1NotificationBoxScreen(vm)
+                    else -> NotificationHomeScreen(vm, summaryViewModel)
                 }
             }
             SnackbarHost(

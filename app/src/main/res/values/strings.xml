@@ -11,6 +11,8 @@
     <string name="notification_screen_title">通知箱</string>
     <string name="notification_data_safety">データと安全性</string>
     <string name="notification_show_onboarding">初回説明を再表示</string>
+    <string name="notification_root_notifications">通知</string>
+    <string name="notification_root_summary">サマリー</string>
 
     <string name="notification_clear_all_title">通知履歴をすべて削除しますか？</string>
     <string name="notification_clear_all_body">ピン留めを含む端末内の履歴が削除されます。アプリ別ルールは残ります。</string>
@@ -76,6 +78,23 @@
     <string name="notification_stats_decision_count">%1$s %2$d件</string>
     <string name="notification_stats_privacy">統計には通知本文やタイトルを保存せず、外部送信もしません。</string>
     <string name="notification_stats_reset_action">分類統計をリセット</string>
+
+    <string name="notification_summary_title">過去24時間の通知サマリー</string>
+    <string name="notification_summary_period">%1$s 以降・%2$s 更新</string>
+    <string name="notification_summary_empty_title">過去24時間の通知はありません</string>
+    <string name="notification_summary_empty_body">通知が届くと、分類別の件数をここで確認できます。</string>
+    <string name="notification_summary_error_title">サマリーを表示できません</string>
+    <string name="notification_summary_error_body">端末内の通知履歴を読み込めませんでした。しばらくしてから再度開いてください。</string>
+    <string name="notification_summary_total_title">総通知</string>
+    <string name="notification_summary_total_description">端末内へ保存された通知</string>
+    <string name="notification_summary_keep_title">優先</string>
+    <string name="notification_summary_keep_description">受信時に優先へ自動分類</string>
+    <string name="notification_summary_digest_title">あとで確認</string>
+    <string name="notification_summary_digest_description">受信時にあとで確認へ自動分類</string>
+    <string name="notification_summary_ignore_title">低優先</string>
+    <string name="notification_summary_ignore_description">受信時に低優先へ自動分類</string>
+    <string name="notification_summary_count">%1$d件</string>
+    <string name="notification_summary_automatic_note">件数は通知受信時の自動分類を集計します。手動指定やアプリ別ルールによる表示上の変更は含みません。</string>
 
     <string name="notification_privacy_storage">通知の送信元、タイトル、本文、時刻、分類結果を端末内だけに保存します。</string>
     <string name="notification_privacy_network">外部APIやクラウドへ送信せず、Androidバックアップも無効です。</string>
