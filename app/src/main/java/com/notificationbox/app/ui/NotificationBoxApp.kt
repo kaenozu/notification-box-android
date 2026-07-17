@@ -22,10 +22,26 @@ import com.notificationbox.app.ui.theme.NotificationBoxTheme
 
 @Composable
 fun NotificationBoxApp(
+    factory: NotificationBoxViewModelFactory,
+    vm: NotificationBoxViewModel = viewModel(factory = factory)
+) {
+    NotificationBoxAppContent(vm = vm, summaryViewModel = null)
+}
+
+@Composable
+fun NotificationBoxApp(
     notificationFactory: NotificationBoxViewModelFactory,
     summaryFactory: NotificationSummaryViewModelFactory,
     vm: NotificationBoxViewModel = viewModel(factory = notificationFactory),
     summaryViewModel: NotificationSummaryViewModel = viewModel(factory = summaryFactory)
+) {
+    NotificationBoxAppContent(vm = vm, summaryViewModel = summaryViewModel)
+}
+
+@Composable
+private fun NotificationBoxAppContent(
+    vm: NotificationBoxViewModel,
+    summaryViewModel: NotificationSummaryViewModel?
 ) {
     val settingsRules by vm.settingsRulesState.collectAsStateWithLifecycle()
     val operationMessage by vm.operationMessage.collectAsStateWithLifecycle()
@@ -59,6 +75,7 @@ fun NotificationBoxApp(
                         )
                     }
 
+                    summaryViewModel == null -> Phase1NotificationBoxScreen(vm)
                     else -> NotificationHomeScreen(vm, summaryViewModel)
                 }
             }
