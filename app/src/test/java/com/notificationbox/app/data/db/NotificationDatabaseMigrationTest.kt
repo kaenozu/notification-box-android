@@ -3,6 +3,7 @@ package com.notificationbox.app.data.db
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.notificationbox.app.model.NotificationContentAvailability
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -32,7 +33,7 @@ class NotificationDatabaseMigrationTest {
     }
 
     @Test
-    fun `migration one to two preserves notifications and creates rule tables`() = runTest {
+    fun `migration one to three preserves notifications and creates rule tables`() = runTest {
         context.openOrCreateDatabase(databaseName, Context.MODE_PRIVATE, null).use { legacy ->
             legacy.execSQL(
                 """
@@ -84,7 +85,10 @@ class NotificationDatabaseMigrationTest {
             NotificationDatabase::class.java,
             databaseName
         )
-            .addMigrations(NotificationDatabase.MIGRATION_1_2)
+            .addMigrations(
+                NotificationDatabase.MIGRATION_1_2,
+                NotificationDatabase.MIGRATION_2_3
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -93,6 +97,10 @@ class NotificationDatabaseMigrationTest {
             assertEquals("existing", notification?.key)
             assertEquals("Title", notification?.title)
             assertNull(notification?.userDecision)
+            assertEquals(
+                NotificationContentAvailability.AVAILABLE.name,
+                notification?.contentAvailability
+            )
 
             migrated.appRuleDao().upsert(
                 AppRuleEntity(

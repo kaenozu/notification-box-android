@@ -3,14 +3,17 @@ package com.notificationbox.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.notificationbox.app.data.NotificationStore
 import com.notificationbox.app.data.repository.NotificationRecord
 import com.notificationbox.app.data.repository.NotificationRepository
+import com.notificationbox.app.data.settings.AppSettings
+import com.notificationbox.app.data.settings.SettingsRepository
 import com.notificationbox.app.domain.dryrun.DryRunPlanner
 import com.notificationbox.app.domain.dryrun.DryRunPreview
 import com.notificationbox.app.domain.dryrun.OrganizationMode
 import com.notificationbox.app.model.AppMode
+import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.AppState
+import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationIngestionHealth
 import com.notificationbox.app.model.NotificationItem
@@ -18,62 +21,114 @@ import com.notificationbox.app.permission.PermissionStatusProvider
 import com.notificationbox.app.service.NotificationIngestionHealthStore
 import java.time.Clock
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class NotificationHistoryUiState(
+    val items: List<NotificationItem> = emptyList(),
+    val selectedFilter: NotificationDecision? = null,
+    val notificationAccessGranted: Boolean = false,
+    val ingestionHealth: NotificationIngestionHealth = NotificationIngestionHealth()
+)
+
+data class SettingsRulesUiState(
+    val settings: AppSettings = AppSettings(),
+    val appRules: List<AppRule> = emptyList(),
+    val classificationStats: ClassificationStats = ClassificationStats()
+)
 
 class NotificationBoxViewModel(
     private val permissionProvider: PermissionStatusProvider,
     private val notificationRepository: NotificationRepository,
+    private val settingsRepository: SettingsRepository,
+    private val notificationContentPresenter: NotificationContentPresenter =
+        NotificationContentPresenter.Identity,
     private val clock: Clock = Clock.systemUTC(),
     private val dryRunPlanner: DryRunPlanner = DryRunPlanner(),
     ingestionHealth: StateFlow<NotificationIngestionHealth> =
         NotificationIngestionHealthStore.health
 ) : ViewModel() {
 
-    data class PermissionState(
-        val notificationAccessGranted: Boolean,
-        val postNotificationsRuntimeGranted: Boolean,
-        val appNotificationsEnabled: Boolean
-    )
-
     data class DryRunState(
         val mode: OrganizationMode,
         val preview: DryRunPreview
     )
 
-    private val permissionState = MutableStateFlow(readPermissionState())
+    private val notificationAccessGranted = MutableStateFlow(
+        permissionProvider.isNotificationListenerGranted()
+    )
     private val organizationMode = MutableStateFlow(OrganizationMode.OBSERVE_ONLY)
-    private val notifications: StateFlow<List<NotificationItem>> =
-        notificationRepository.observeNotifications().stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            emptyList()
-        )
-    private val storedState = combine(
-        NotificationStore.state,
-        ingestionHealth
-    ) { storeState, health ->
-        storeState.copy(ingestionHealth = health)
-    }
+    private val mutableOperationMessage = MutableStateFlow<String?>(null)
+    val operationMessage: StateFlow<String?> = mutableOperationMessage.asStateFlow()
 
-    val state: StateFlow<AppState> = combine(
-        storedState,
+    private val notifications: StateFlow<List<NotificationItem>> =
+        notificationRepository.observeNotifications()
+            .map { items -> items.map(notificationContentPresenter::present) }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                emptyList()
+            )
+
+    val historyState: StateFlow<NotificationHistoryUiState> = combine(
         notifications,
+        settingsRepository.settings,
+        notificationAccessGranted,
+        ingestionHealth
+    ) { items, settings, listenerGranted, health ->
+        NotificationHistoryUiState(
+            items = items,
+            selectedFilter = settings.selectedFilter,
+            notificationAccessGranted = listenerGranted,
+            ingestionHealth = health
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        NotificationHistoryUiState()
+    )
+
+    val settingsRulesState: StateFlow<SettingsRulesUiState> = combine(
+        settingsRepository.settings,
         notificationRepository.observeAppRules(),
-        notificationRepository.observeClassificationStats(),
-        permissionState
-    ) { storeState, notificationItems, appRules, stats, permissions ->
-        storeState.copy(
-            notificationAccessGranted = permissions.notificationAccessGranted,
-            postNotificationsRuntimeGranted = permissions.postNotificationsRuntimeGranted,
-            appNotificationsEnabled = permissions.appNotificationsEnabled,
-            items = notificationItems,
+        notificationRepository.observeClassificationStats()
+    ) { settings, appRules, stats ->
+        SettingsRulesUiState(
+            settings = settings,
             appRules = appRules,
             classificationStats = stats
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        SettingsRulesUiState()
+    )
+
+    /** Compatibility aggregate for onboarding and the Phase 1 preview surface. */
+    val state: StateFlow<AppState> = combine(
+        historyState,
+        settingsRulesState
+    ) { history, settingsRules ->
+        val settings = settingsRules.settings
+        AppState(
+            mode = settings.mode,
+            preferencesLoaded = settings.preferencesLoaded,
+            onboardingCompleted = settings.onboardingCompleted,
+            notificationAccessGranted = history.notificationAccessGranted,
+            digestSchedule = settings.digestSchedule,
+            pausedUntilText = settings.pausedUntilText,
+            items = history.items,
+            appRules = settingsRules.appRules,
+            classificationStats = settingsRules.classificationStats,
+            ingestionHealth = history.ingestionHealth,
+            selectedFilter = history.selectedFilter
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppState())
 
@@ -95,55 +150,64 @@ class NotificationBoxViewModel(
     )
 
     fun refreshPermissions() {
-        permissionState.value = readPermissionState()
+        notificationAccessGranted.value = permissionProvider.isNotificationListenerGranted()
     }
 
-    fun completeOnboarding() = NotificationStore.setOnboardingCompleted(true)
+    fun completeOnboarding() = launchOperation("初回設定の保存に失敗しました") {
+        settingsRepository.setOnboardingCompleted(true)
+    }
 
-    fun resetOnboarding() = NotificationStore.setOnboardingCompleted(false)
+    fun resetOnboarding() = launchOperation("初回説明の再表示設定に失敗しました") {
+        settingsRepository.setOnboardingCompleted(false)
+    }
 
-    fun setMode(mode: AppMode) = NotificationStore.setMode(mode)
+    fun setMode(mode: AppMode) = launchOperation("モード設定の保存に失敗しました") {
+        settingsRepository.setMode(mode)
+    }
 
     fun setOrganizationMode(mode: OrganizationMode) {
         organizationMode.value = mode
     }
 
-    fun setFilter(filter: NotificationDecision?) = NotificationStore.setFilter(filter)
-
-    fun pause(label: String) = NotificationStore.pauseSummary(label)
-
-    fun setDigestHours(hours: List<Int>) = NotificationStore.setDigestHours(hours)
-
-    fun clearAll() {
-        viewModelScope.launch { notificationRepository.clearAll() }
+    fun setFilter(filter: NotificationDecision?) {
+        settingsRepository.setFilter(filter)
     }
 
-    fun resetClassificationStats() {
-        viewModelScope.launch { notificationRepository.resetClassificationStats() }
+    fun pause(label: String) = launchOperation("一時停止設定の保存に失敗しました") {
+        settingsRepository.pauseSummary(label)
     }
 
-    fun togglePinned(key: String, pinned: Boolean) {
-        viewModelScope.launch { notificationRepository.setPinned(key, pinned) }
+    fun setDigestHours(hours: List<Int>) = launchOperation("時刻設定の保存に失敗しました") {
+        settingsRepository.setDigestHours(hours)
     }
 
-    fun setNotificationDecision(key: String, decision: NotificationDecision?) {
-        viewModelScope.launch {
+    fun clearAll() = launchOperation("通知履歴を削除できませんでした") {
+        notificationRepository.clearAll()
+    }
+
+    fun resetClassificationStats() = launchOperation("分類統計をリセットできませんでした") {
+        notificationRepository.resetClassificationStats()
+    }
+
+    fun togglePinned(key: String, pinned: Boolean) = launchOperation("ピン留めを更新できませんでした") {
+        notificationRepository.setPinned(key, pinned)
+    }
+
+    fun setNotificationDecision(key: String, decision: NotificationDecision?) =
+        launchOperation("この通知の分類を更新できませんでした") {
             notificationRepository.setNotificationDecision(key, decision)
         }
-    }
 
     fun setAppRule(
         packageName: String,
         appLabel: String,
         decision: NotificationDecision?
-    ) {
-        viewModelScope.launch {
-            notificationRepository.setAppRule(packageName, appLabel, decision)
-        }
+    ) = launchOperation("アプリ別ルールを更新できませんでした") {
+        notificationRepository.setAppRule(packageName, appLabel, decision)
     }
 
-    fun delete(key: String) {
-        viewModelScope.launch { notificationRepository.delete(key) }
+    fun delete(key: String) = launchOperation("通知履歴を削除できませんでした") {
+        notificationRepository.delete(key)
     }
 
     fun seed() {
@@ -176,29 +240,47 @@ class NotificationBoxViewModel(
                 reason = "デバッグ用通知"
             )
         )
-        viewModelScope.launch {
+        launchOperation("デモ通知を追加できませんでした") {
             records.forEach { notificationRepository.upsert(it) }
         }
     }
 
-    private fun readPermissionState(): PermissionState =
-        PermissionState(
-            notificationAccessGranted = permissionProvider.isNotificationListenerGranted(),
-            postNotificationsRuntimeGranted =
-                permissionProvider.hasPostNotificationsRuntimePermission(),
-            appNotificationsEnabled = permissionProvider.areAppNotificationsEnabled()
-        )
+    fun consumeOperationMessage() {
+        mutableOperationMessage.value = null
+    }
+
+    private fun launchOperation(
+        failureMessage: String,
+        operation: suspend () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                operation()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                mutableOperationMessage.value = failureMessage
+            }
+        }
+    }
 }
 
 class NotificationBoxViewModelFactory(
     private val permissionProvider: PermissionStatusProvider,
-    private val notificationRepository: NotificationRepository
+    private val notificationRepository: NotificationRepository,
+    private val settingsRepository: SettingsRepository,
+    private val notificationContentPresenter: NotificationContentPresenter =
+        NotificationContentPresenter.Identity
 ) : ViewModelProvider.Factory {
-
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NotificationBoxViewModel::class.java)) {
-            return NotificationBoxViewModel(permissionProvider, notificationRepository) as T
+            return NotificationBoxViewModel(
+                permissionProvider = permissionProvider,
+                notificationRepository = notificationRepository,
+                settingsRepository = settingsRepository,
+                notificationContentPresenter = notificationContentPresenter
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

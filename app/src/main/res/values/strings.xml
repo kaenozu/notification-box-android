@@ -1,8 +1,119 @@
 <resources>
     <string name="app_name">通知箱</string>
     <string name="notification_listener_label">通知箱の通知アクセス</string>
+
+    <string name="common_delete">削除</string>
+    <string name="common_cancel">キャンセル</string>
+    <string name="common_reset">リセット</string>
+    <string name="common_close">閉じる</string>
+    <string name="common_all">すべて</string>
+
+    <string name="notification_screen_title">通知箱</string>
+    <string name="notification_data_safety">データと安全性</string>
+    <string name="notification_show_onboarding">初回説明を再表示</string>
+    <string name="notification_root_notifications">通知</string>
+    <string name="notification_root_summary">サマリー</string>
+
+    <string name="notification_clear_all_title">通知履歴をすべて削除しますか？</string>
+    <string name="notification_clear_all_body">ピン留めを含む端末内の履歴が削除されます。アプリ別ルールは残ります。</string>
+    <string name="notification_stats_reset_title">分類統計をリセットしますか？</string>
+    <string name="notification_stats_reset_body">分類件数と補正操作の集計だけを削除します。通知履歴とアプリ別ルールは残ります。</string>
+    <string name="notification_delete_one_title">この履歴を削除しますか？</string>
+    <string name="notification_delete_one_body">「%1$s」のこの通知履歴だけを端末内から削除します。元のOS通知は変更しません。</string>
+
+    <string name="notification_tab_history">通知履歴 (%1$d)</string>
+    <string name="notification_tab_app_rules">アプリ別ルール (%1$d)</string>
+
+    <string name="notification_status_title">通知を端末内で整理</string>
+    <string name="notification_access_granted_body">通知アクセスは許可済みです。届いた通知を端末内の履歴へ反映します。</string>
+    <string name="notification_access_missing_body">通知アクセスが未許可です。許可するまで通知内容は読み取りません。</string>
+    <string name="notification_access_check">通知アクセスを確認</string>
+    <string name="notification_access_setup">通知アクセスを設定</string>
+    <string name="notification_demo_add">デモ追加</string>
+    <string name="notification_clear_all_action">履歴をすべて削除</string>
+
+    <string name="notification_ingestion_healthy">通知取込は正常です（処理済み %1$d件）</string>
+    <string name="notification_ingestion_failed">通知取込で累計 %1$d件の問題を検出しました。最終状態: %2$s。通知内容は診断情報へ保存しません。</string>
+    <string name="notification_error_snapshot">現在の通知一覧を取得できませんでした</string>
+    <string name="notification_error_mapping">一部の通知を読み取れませんでした</string>
+    <string name="notification_error_repository">端末内への保存に失敗しました</string>
+    <string name="notification_error_queue_closed">通知取込の終了処理中に新しい通知を受け取りました</string>
+    <string name="notification_error_unknown">詳細不明</string>
+
+    <string name="notification_safety_title">安全な観察・試算版</string>
+    <string name="notification_safety_body">このバージョンは元のOS通知を削除、抑制、スヌーズ、遅延しません。分類と整理プレビューだけを行います。</string>
+
+    <string name="notification_title_missing">タイトルなし</string>
+    <string name="notification_pin">ピン留め</string>
+    <string name="notification_unpin">ピン留めを解除</string>
+    <string name="notification_delete_history">履歴から削除</string>
+    <string name="notification_active">端末に表示中</string>
+    <string name="notification_removed">通知終了済み</string>
+    <string name="notification_classification_heading">この通知の分類</string>
+    <string name="notification_classification_toggle_hint">選択中の分類をもう一度押すと、この通知だけ自動分類へ戻ります。</string>
+    <string name="notification_edit_app_rule">このアプリのルールを設定</string>
+    <string name="notification_detail_open">判定の詳細</string>
+    <string name="notification_detail_close">詳細を閉じる</string>
+    <string name="notification_decision_source">判定元: %1$s</string>
+    <string name="notification_automatic_result">自動分類: %1$s — %2$s</string>
+    <string name="notification_app_icon_description">%1$sのアイコン</string>
+
+    <string name="notification_empty_title">通知履歴はまだありません</string>
+    <string name="notification_empty_granted_body">通知が届くと、ここに端末内の分類履歴が表示されます。</string>
+    <string name="notification_empty_missing_permission_body">通知アクセスを許可すると、以降に届く通知を端末内で分類できます。</string>
+    <string name="notification_filter_empty_title">この分類の通知はありません</string>
+    <string name="notification_filter_empty_body">別の分類を選ぶと、保存済みの通知を確認できます。</string>
+
+    <string name="notification_rule_title">%1$sのルール</string>
+    <string name="notification_rule_body">このアプリ全体に適用します。通知ごとの手動指定を優先します。</string>
+    <string name="notification_rule_always">常に%1$s</string>
+    <string name="notification_rule_remove">アプリ別設定を解除</string>
+    <string name="notification_rule_change_count">補正・設定: %1$d回</string>
+    <string name="notification_rules_empty_title">アプリ別ルールはありません</string>
+    <string name="notification_rules_empty_body">通知履歴から「このアプリのルール」を選ぶと登録できます。</string>
+
+    <string name="notification_stats_title">端末内の分類傾向</string>
+    <string name="notification_stats_summary">自動分類 %1$d件 / 手動補正 %2$d回 / ルール変更 %3$d回</string>
+    <string name="notification_stats_operation_ratio">自動分類1件あたりの補正操作: %1$s回</string>
+    <string name="notification_stats_decision_count">%1$s %2$d件</string>
+    <string name="notification_stats_privacy">統計には通知本文やタイトルを保存せず、外部送信もしません。</string>
+    <string name="notification_stats_reset_action">分類統計をリセット</string>
+
+    <string name="notification_summary_title">過去24時間の通知サマリー</string>
+    <string name="notification_summary_period">%1$s 以降・%2$s 更新</string>
+    <string name="notification_summary_empty_title">過去24時間の通知はありません</string>
+    <string name="notification_summary_empty_body">通知が届くと、分類別の件数をここで確認できます。</string>
+    <string name="notification_summary_error_title">サマリーを表示できません</string>
+    <string name="notification_summary_error_body">端末内の通知履歴を読み込めませんでした。しばらくしてから再度開いてください。</string>
+    <string name="notification_summary_total_title">総通知</string>
+    <string name="notification_summary_total_description">端末内へ保存された通知</string>
+    <string name="notification_summary_keep_title">優先</string>
+    <string name="notification_summary_keep_description">受信時に優先へ自動分類</string>
+    <string name="notification_summary_digest_title">あとで確認</string>
+    <string name="notification_summary_digest_description">受信時にあとで確認へ自動分類</string>
+    <string name="notification_summary_ignore_title">低優先</string>
+    <string name="notification_summary_ignore_description">受信時に低優先へ自動分類</string>
+    <string name="notification_summary_count">%1$d件</string>
+    <string name="notification_summary_automatic_note">件数は通知受信時の自動分類を集計します。手動指定やアプリ別ルールによる表示上の変更は含みません。</string>
+
+    <string name="notification_privacy_storage">通知の送信元、タイトル、本文、時刻、分類結果を端末内だけに保存します。</string>
+    <string name="notification_privacy_network">外部APIやクラウドへ送信せず、Androidバックアップも無効です。</string>
+    <string name="notification_privacy_retention">非アクティブでピン留めされていない7日超の履歴を整理し、履歴は原則500件を上限とします。</string>
+    <string name="notification_privacy_os_boundary">このバージョンは元のOS通知を変更しません。</string>
+
+    <string name="notification_decision_keep">優先</string>
+    <string name="notification_decision_digest">あとで確認</string>
+    <string name="notification_decision_ignore">低優先</string>
+    <string name="notification_source_automatic">自動分類</string>
+    <string name="notification_source_app_rule">アプリ別ルール</string>
+    <string name="notification_source_user_override">この通知の手動指定</string>
+
     <string name="notification_reason_app_rule">%1$sを「%2$s」に設定済み</string>
     <string name="notification_reason_user_override">ユーザーがこの通知を「%1$s」に変更</string>
+    <string name="notification_content_empty_title">内容なし</string>
+    <string name="notification_content_unavailable_title">内容を取得できません</string>
+    <string name="notification_content_unavailable_body">Androidまたは通知元アプリにより通知内容が非公開です。</string>
+
     <string name="dry_run_preview_title">整理プレビュー（非実行）</string>
     <string name="dry_run_preview_active_count_short">表示中の通知 %1$d件を端末内で試算</string>
     <string name="dry_run_mode_observe">観察のみ</string>

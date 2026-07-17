@@ -18,9 +18,11 @@ Android向けの、端末内通知履歴・分類プレビューアプリです�
 - 端末内だけで保持する分類補正統計と明示的リセット
 - 個別ピン留め、確認付き個別削除、確認付き全消去
 - `NotificationListenerService`からの通知履歴同期
-- 単一キューによる通知投稿・削除・再接続同期の順序保持
+- bounded単一キューによる通知投稿・削除・再接続同期の順序保持
+- キュー過負荷時の通知リスナー再接続とスナップショット再同期
 - Roomによる端末内の通知履歴保存
 - MessagingStyleを含む通知本文の安全な抽出
+- 内容を取得できない通知のメタデータ限定fail-open保存
 - 通知取込エラーの内容非保持カウンター
 - ライト／ダークテーマおよびAndroid 12以降のダイナミックカラー
 
@@ -29,11 +31,12 @@ Android向けの、端末内通知履歴・分類プレビューアプリです�
 - 通知タイトルと本文は外部APIへ送信せず、端末内だけで処理します。
 - アプリには`INTERNET`権限、広告SDK、解析SDK、クラッシュ収集SDKを含めません。
 - 分類統計には通知タイトル・本文を保存せず、件数とパッケージ名だけを保持します。
-- 非アクティブかつピン留めされていない7日超の履歴は、アプリ起動・通知投稿・削除・再同期・ピン解除時の整理処理で削除します。
+- 通知終了時刻から7日を超えた、非アクティブかつピン留めされていない履歴を整理処理で削除します。
 - 履歴は原則500件を上限とし、ピン留め通知は自動削除から保護します。
 - Androidバックアップは無効です。
 - 通知タイトルや本文をアプリログや取込エラー状態へ出力しません。
 - 整理プレビューの集計はセッション内だけで生成し、永続化しません。
+- 通知内容を表示する画面は`FLAG_SECURE`で保護し、スクリーンショット、画面録画、タスク切替プレビューへの露出を抑止します。
 
 公開用の方針は[`docs/privacy-policy-ja.md`](docs/privacy-policy-ja.md)を参照してください。
 
@@ -57,16 +60,11 @@ WindowsとLinuxでRoom/RobolectricテストのSQLiteバックエンドを揃え�
 
 ## Release署名
 
-Release署名は秘密情報をソースへ書かず、次の環境変数がすべてある場合だけ有効になります。
+PRと通常の手動検証ではunsigned Release APK/AABだけを生成します。
 
-```text
-ANDROID_KEYSTORE_PATH
-ANDROID_KEYSTORE_PASSWORD
-ANDROID_KEY_ALIAS
-ANDROID_KEY_PASSWORD
-```
+署名付き候補は、GitHub Actionsの`Android Release Candidate`を`sign=true`で手動実行し、保護された`release-signing` Environmentの承認後にだけ生成します。署名対象は検証済みの現在の`main`完全SHAに限定され、署名工程ではリポジトリ内のGradleやスクリプトを実行しません。
 
-GitHub Actionsでは`ANDROID_KEYSTORE_BASE64`を加えた4つのActions Secretsから一時キーストアを生成します。詳細は[`docs/release-runbook.md`](docs/release-runbook.md)を参照してください。
+APKとAABの署名検証が成功しなければ、署名付き成果物は作成されません。詳細は[`docs/release-runbook.md`](docs/release-runbook.md)を参照してください。
 
 ## 実機検証
 

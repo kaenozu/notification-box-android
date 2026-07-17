@@ -20,9 +20,8 @@ data class NotificationPreferenceState(
     val digestSchedule: DigestSchedule = DigestSchedule()
 )
 
-object NotificationPreferences {
-    @Volatile
-    private var appContext: Context? = null
+class NotificationPreferences(context: Context) {
+    private val dataStore = context.applicationContext.notificationPrefsDataStore
 
     private val modeKey = stringPreferencesKey("mode")
     private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed_v1")
@@ -35,14 +34,8 @@ object NotificationPreferences {
         intPreferencesKey("digest_hour_4")
     )
 
-    fun initialize(context: Context) {
-        if (appContext == null) {
-            appContext = context.applicationContext
-        }
-    }
-
     fun observeState(): Flow<NotificationPreferenceState> =
-        requireContext().notificationPrefsDataStore.data.map { prefs ->
+        dataStore.data.map { prefs ->
             val mode = prefs[modeKey]
                 ?.let { stored -> runCatching { AppMode.valueOf(stored) }.getOrNull() }
                 ?: AppMode.Observation
@@ -71,19 +64,19 @@ object NotificationPreferences {
         }
 
     suspend fun saveMode(mode: AppMode) {
-        requireContext().notificationPrefsDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[modeKey] = mode.name
         }
     }
 
     suspend fun saveOnboardingCompleted(completed: Boolean) {
-        requireContext().notificationPrefsDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[onboardingCompletedKey] = completed
         }
     }
 
     suspend fun savePausedText(text: String) {
-        requireContext().notificationPrefsDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[pausedTextKey] = text
         }
     }
@@ -96,7 +89,7 @@ object NotificationPreferences {
             .take(digestHourKeys.size)
             .ifEmpty { defaults }
 
-        requireContext().notificationPrefsDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[digestHourCountKey] = normalized.size
             digestHourKeys.forEachIndexed { index, key ->
                 prefs[key] = normalized.getOrNull(index)
@@ -104,7 +97,4 @@ object NotificationPreferences {
             }
         }
     }
-
-    private fun requireContext(): Context =
-        checkNotNull(appContext) { "NotificationPreferences not initialized" }
 }

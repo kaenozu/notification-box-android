@@ -7,9 +7,15 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Branch, tag, or commit SHA to build
+        description: Exact branch, tag, or commit SHA to validate without signing
         required: true
         default: main
+        type: string
+      sign:
+        description: Sign the validated artifact after protected-environment approval
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -19,12 +25,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  release-candidate:
+  validate-unsigned:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    outputs:
+      tested_sha: ${{ steps.identity.outputs.tested_sha }}
+      artifact_name: ${{ steps.identity.outputs.artifact_name }}
     steps:
       - name: Checkout candidate
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -47,179 +52,77 @@ jobs:
           git config core.fileMode false
           chmod +x gradlew
 
-      - name: Prepare optional release signing
-        id: signing
+      - name: Record exact candidate identity
+        id: identity
         shell: bash
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          present=0
-          for value in "$KEYSTORE_BASE64" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD"; do
-            if [ -n "$value" ]; then present=$((present + 1)); fi
-          done
-          if [ "$present" -ne 0 ] && [ "$present" -ne 4 ]; then
-            echo "Release signing secrets must be configured all together or all omitted." >&2
-            exit 1
-          fi
-          if [ "$present" -eq 4 ]; then
-            keystore="$RUNNER_TEMP/notification-box-upload.jks"
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
-            chmod 600 "$keystore"
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-            echo "ANDROID_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          fi
+          tested_sha="$(git rev-parse HEAD)"
+          artifact_name="notification-box-unsigned-$tested_sha"
+          echo "tested_sha=$tested_sha" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
 
       - name: Verify immutable action references
-        id: action_pins
         shell: bash
-        run: |
-          set +e
-          log="$RUNNER_TEMP/action-pins.log"
-          python3 .github/scripts/verify-action-pins.py > "$log" 2>&1
-          exit_code=$?
-          cat "$log"
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          exit 0
+        run: python3 .github/scripts/verify-action-pins.py
 
       - name: Run unit tests
-        id: unit_tests
         shell: bash
-        run: |
-          set +e
-          log="$RUNNER_TEMP/release-unit-tests.log"
-          ./gradlew testDebugUnitTest --no-daemon > "$log" 2>&1
-          exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          exit 0
+        run: ./gradlew testDebugUnitTest --no-daemon
 
       - name: Run release lint
-        id: lint_release
         shell: bash
-        run: |
-          set +e
-          log="$RUNNER_TEMP/lint-release.log"
-          ./gradlew lintRelease --no-daemon > "$log" 2>&1
-          exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          exit 0
+        run: ./gradlew lintRelease --no-daemon
 
-      - name: Build release bundle
-        id: bundle_release
+      - name: Build unsigned release artifacts
         shell: bash
         run: |
-          set +e
-          log="$RUNNER_TEMP/bundle-release.log"
-          ./gradlew bundleRelease --no-daemon > "$log" 2>&1
-          exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then cat "$log"; fi
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          exit 0
+          set -euo pipefail
+          ./gradlew bundleRelease assembleRelease --no-daemon
+          bash .github/scripts/verify-release-manifest.sh
 
-      - name: Build release APK and verify manifest boundary
-        id: assemble_release
-        shell: bash
-        run: |
-          set +e
-          build_log="$RUNNER_TEMP/assemble-release.log"
-          manifest_log="$RUNNER_TEMP/release-manifest.log"
-          ./gradlew assembleRelease --no-daemon > "$build_log" 2>&1
-          exit_code=$?
-          if [ "$exit_code" -eq 0 ]; then
-            bash .github/scripts/verify-release-manifest.sh > "$manifest_log" 2>&1
-            exit_code=$?
-          else
-            : > "$manifest_log"
+          apk_count="$(find app/build/outputs/apk/release -type f -name '*.apk' | wc -l)"
+          aab_count="$(find app/build/outputs/bundle/release -type f -name '*.aab' | wc -l)"
+          if [ "$apk_count" -ne 1 ] || [ "$aab_count" -ne 1 ]; then
+            echo "Expected exactly one unsigned APK and one unsigned AAB." >&2
+            exit 1
           fi
-          if [ "$exit_code" -ne 0 ]; then
-            cat "$build_log"
-            cat "$manifest_log"
-          fi
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          exit 0
 
-      - name: Create candidate metadata
-        id: metadata
-        if: always()
+      - name: Create unsigned candidate metadata
         shell: bash
-        env:
-          SIGNING_READY: ${{ steps.signing.outputs.ready }}
         run: |
-          set +e
-          metadata="$RUNNER_TEMP/release-candidate-metadata.txt"
-          tested_sha="$(git rev-parse HEAD)"
+          set -euo pipefail
+          metadata="$RUNNER_TEMP/unsigned-candidate-metadata.txt"
           {
             echo "repository=kaenozu/notification-box-android"
-            echo "tested_sha=$tested_sha"
+            echo "tested_sha=${{ steps.identity.outputs.tested_sha }}"
             echo "version_name=0.1.0"
             echo "version_code=1"
-            echo "release_signing_configured=${SIGNING_READY:-false}"
+            echo "target_sdk=37"
+            echo "signed=false"
             echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo
             echo "artifact_sha256:"
           } > "$metadata"
-
           find app/build/outputs/bundle/release app/build/outputs/apk/release \
-            -type f \( -name '*.aab' -o -name '*.apk' \) -print0 2>/dev/null \
+            -type f \( -name '*.aab' -o -name '*.apk' \) -print0 \
             | sort -z \
-            | xargs -0 -r sha256sum \
+            | xargs -0 sha256sum \
             | tee -a "$metadata"
 
-          apk="$(find app/build/outputs/apk/release -type f -name '*.apk' 2>/dev/null | head -n 1 || true)"
-          if [ -n "$apk" ] && [ "${SIGNING_READY:-false}" = "true" ]; then
-            apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-            echo >> "$metadata"
-            echo "apk_signing_certificate:" >> "$metadata"
-            "$apksigner" verify --print-certs "$apk" | tee -a "$metadata"
-          fi
-
-          aab="$(find app/build/outputs/bundle/release -type f -name '*.aab' 2>/dev/null | head -n 1 || true)"
-          if [ -n "$aab" ] && [ "${SIGNING_READY:-false}" = "true" ]; then
-            jarsigner -verify "$aab" >/dev/null
-            echo "aab_signature_verification=PASS" >> "$metadata"
-          fi
-
-          cat "$metadata"
-          echo "tested_sha=$tested_sha" >> "$GITHUB_OUTPUT"
-          exit 0
-
       - name: Verify repository remains clean
-        id: repository
-        if: always()
         shell: bash
         run: |
-          set +e
-          log="$RUNNER_TEMP/repository.log"
-          : > "$log"
-          failed=0
-          git diff --check >> "$log" 2>&1 || failed=1
-          git diff --exit-code -- app/schemas >> "$log" 2>&1 || failed=1
-          untracked="$(git ls-files --others --exclude-standard app/schemas)"
-          if [ -n "$untracked" ]; then
-            printf '%s\n' "$untracked" >> "$log"
-            failed=1
-          fi
-          working_tree="$(git status --porcelain --untracked-files=all)"
-          if [ -n "$working_tree" ]; then
-            printf '%s\n' "$working_tree" >> "$log"
-            failed=1
-          fi
-          if [ "$failed" -ne 0 ]; then cat "$log"; fi
-          echo "exit_code=$failed" >> "$GITHUB_OUTPUT"
-          exit 0
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code -- app/schemas
+          test -z "$(git ls-files --others --exclude-standard app/schemas)"
+          test -z "$(git status --porcelain --untracked-files=all)"
 
-      - name: Upload release candidate and diagnostics
-        if: always()
+      - name: Upload unsigned candidate and diagnostics
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: notification-box-release-candidate-${{ steps.metadata.outputs.tested_sha || github.sha }}
+          name: ${{ steps.identity.outputs.artifact_name }}
           path: |
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/apk/release/*.apk
@@ -227,44 +130,130 @@ jobs:
             app/build/reports/lint-results-release.txt
             app/build/reports/tests/testDebugUnitTest
             app/build/test-results/testDebugUnitTest
-            ${{ runner.temp }}/action-pins.log
-            ${{ runner.temp }}/release-unit-tests.log
-            ${{ runner.temp }}/lint-release.log
-            ${{ runner.temp }}/bundle-release.log
-            ${{ runner.temp }}/assemble-release.log
-            ${{ runner.temp }}/release-manifest.log
-            ${{ runner.temp }}/repository.log
-            ${{ runner.temp }}/release-candidate-metadata.txt
-          if-no-files-found: warn
+            app/schemas
+            ${{ runner.temp }}/unsigned-candidate-metadata.txt
+          if-no-files-found: error
           retention-days: 14
 
-      - name: Verify release candidate outcomes
-        if: always()
+  sign-candidate:
+    needs: validate-unsigned
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign }}
+    runs-on: ubuntu-latest
+    environment: release-signing
+    steps:
+      - name: Checkout protected main for identity verification only
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Require exact current main SHA
         shell: bash
         env:
-          ACTION_PINS_EXIT: ${{ steps.action_pins.outputs.exit_code }}
-          UNIT_EXIT: ${{ steps.unit_tests.outputs.exit_code }}
-          LINT_EXIT: ${{ steps.lint_release.outputs.exit_code }}
-          BUNDLE_EXIT: ${{ steps.bundle_release.outputs.exit_code }}
-          ASSEMBLE_EXIT: ${{ steps.assemble_release.outputs.exit_code }}
-          REPOSITORY_EXIT: ${{ steps.repository.outputs.exit_code }}
+          TESTED_SHA: ${{ needs.validate-unsigned.outputs.tested_sha }}
         run: |
-          failed=0
-          for result in \
-            "$ACTION_PINS_EXIT" \
-            "$UNIT_EXIT" \
-            "$LINT_EXIT" \
-            "$BUNDLE_EXIT" \
-            "$ASSEMBLE_EXIT" \
-            "$REPOSITORY_EXIT"; do
-            if [ "$result" != "0" ]; then failed=1; fi
-          done
-          if [ "$failed" -ne 0 ]; then
-            echo "Action pins exit: $ACTION_PINS_EXIT"
-            echo "Unit tests exit: $UNIT_EXIT"
-            echo "Release lint exit: $LINT_EXIT"
-            echo "Bundle release exit: $BUNDLE_EXIT"
-            echo "Assemble/manifest exit: $ASSEMBLE_EXIT"
-            echo "Repository exit: $REPOSITORY_EXIT"
+          set -euo pipefail
+          if [[ ! "$TESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Signing requires an exact 40-character commit SHA." >&2
             exit 1
           fi
+          main_sha="$(git rev-parse HEAD)"
+          if [ "$TESTED_SHA" != "$main_sha" ]; then
+            echo "Signing is restricted to the exact current protected main SHA." >&2
+            echo "tested=$TESTED_SHA main=$main_sha" >&2
+            exit 1
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download validated unsigned artifact
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317
+        with:
+          name: ${{ needs.validate-unsigned.outputs.artifact_name }}
+          path: unsigned-candidate
+
+      - name: Sign and verify without executing repository code
+        id: signing
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          TESTED_SHA: ${{ needs.validate-unsigned.outputs.tested_sha }}
+        run: |
+          set -euo pipefail
+          for value in "$KEYSTORE_BASE64" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD"; do
+            if [ -z "$value" ]; then
+              echo "All release-signing environment secrets are required." >&2
+              exit 1
+            fi
+          done
+
+          unsigned_apk="$(find unsigned-candidate -type f -name '*.apk' | head -n 1)"
+          unsigned_aab="$(find unsigned-candidate -type f -name '*.aab' | head -n 1)"
+          test -n "$unsigned_apk"
+          test -n "$unsigned_aab"
+
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          zipalign="$build_tools/zipalign"
+          apksigner="$build_tools/apksigner"
+          test -x "$zipalign"
+          test -x "$apksigner"
+
+          keystore="$RUNNER_TEMP/notification-box-upload.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+
+          output_dir="$RUNNER_TEMP/signed-candidate"
+          mkdir -p "$output_dir"
+          aligned_apk="$RUNNER_TEMP/app-release-aligned.apk"
+          signed_apk="$output_dir/notification-box-$TESTED_SHA.apk"
+          signed_aab="$output_dir/notification-box-$TESTED_SHA.aab"
+
+          "$zipalign" -f 4 "$unsigned_apk" "$aligned_apk"
+          "$apksigner" sign \
+            --ks "$keystore" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out "$signed_apk" \
+            "$aligned_apk"
+          "$apksigner" verify --verbose --print-certs "$signed_apk" \
+            | tee "$output_dir/apk-signing-certificate.txt"
+
+          jarsigner \
+            -keystore "$keystore" \
+            -storepass:env KEYSTORE_PASSWORD \
+            -keypass:env KEY_PASSWORD \
+            -signedjar "$signed_aab" \
+            "$unsigned_aab" \
+            "$KEY_ALIAS"
+          jarsigner -verify -strict -verbose "$signed_aab" \
+            > "$output_dir/aab-signature-verification.txt"
+
+          {
+            echo "repository=kaenozu/notification-box-android"
+            echo "tested_sha=$TESTED_SHA"
+            echo "version_name=0.1.0"
+            echo "version_code=1"
+            echo "target_sdk=37"
+            echo "signed=true"
+            echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            sha256sum "$signed_apk" "$signed_aab"
+          } > "$output_dir/signed-candidate-metadata.txt"
+
+          echo "output_dir=$output_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: notification-box-signed-${{ needs.validate-unsigned.outputs.tested_sha }}
+          path: ${{ steps.signing.outputs.output_dir }}
+          if-no-files-found: error
+          retention-days: 14

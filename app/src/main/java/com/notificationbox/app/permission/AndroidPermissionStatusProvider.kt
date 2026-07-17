@@ -6,10 +6,4 @@ class AndroidPermissionStatusProvider(
 
     override fun isNotificationListenerGranted(): Boolean =
         platform.enabledListenerPackages().contains(platform.packageName)
-
-    override fun hasPostNotificationsRuntimePermission(): Boolean =
-        platform.sdkInt < 33 || platform.hasPostNotificationsPermission()
-
-    override fun areAppNotificationsEnabled(): Boolean =
-        platform.areNotificationsEnabled()
 }

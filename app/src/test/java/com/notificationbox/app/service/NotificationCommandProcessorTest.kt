@@ -71,6 +71,42 @@ class NotificationCommandProcessorTest {
     }
 
     @Test
+    fun `bounded queue reports overflow and requests reconciliation`() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val repository = RecordingRepository(
+            beforeUpsert = {
+                started.complete(Unit)
+                release.await()
+            }
+        )
+        val health = RecordingHealthReporter()
+        var reconciliationRequests = 0
+        val queue = NotificationCommandQueue(
+            scope = backgroundScope,
+            processor = NotificationCommandProcessor(repository, health),
+            healthReporter = health,
+            capacity = 1,
+            onOverflow = { reconciliationRequests++ }
+        )
+
+        assertTrue(queue.submit(NotificationCommand.Upsert(record("processing"))))
+        runCurrent()
+        started.await()
+        assertTrue(queue.submit(NotificationCommand.Upsert(record("queued"))))
+        assertFalse(queue.submit(NotificationCommand.Upsert(record("overflow"))))
+
+        assertEquals(1, reconciliationRequests)
+        assertEquals(1L, health.health.value.failedCommands)
+        assertEquals(IngestionErrorCode.REPOSITORY_OPERATION_FAILED, health.health.value.lastError)
+
+        release.complete(Unit)
+        advanceUntilIdle()
+        queue.close()
+        queue.join()
+    }
+
+    @Test
     fun `close drains accepted command and rejects later submission`() = runTest {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()

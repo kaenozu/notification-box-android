@@ -206,6 +206,7 @@ class FakeNotificationRepository : NotificationRepository {
                 finalDecision,
                 source
             ),
+            contentAvailability = notification.contentAvailability,
             userPinned = existing?.userPinned ?: false,
             isActive = notification.isActive,
             removedAt = notification.removedAtMillis?.let(Instant::ofEpochMilli)

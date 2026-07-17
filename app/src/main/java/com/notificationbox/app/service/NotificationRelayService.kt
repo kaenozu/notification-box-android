@@ -1,5 +1,8 @@
 package com.notificationbox.app.service
 
+import android.content.ComponentName
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.notificationbox.app.App
@@ -16,6 +19,7 @@ import kotlinx.coroutines.launch
 class NotificationRelayService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val clock: Clock = Clock.systemUTC()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var commandQueue: NotificationCommandQueue
 
     private val repository: NotificationRepository by lazy {
@@ -29,38 +33,42 @@ class NotificationRelayService : NotificationListenerService() {
         )
     }
 
+    private val rebindCoordinator: NotificationRebindCoordinator by lazy {
+        val componentName = ComponentName(
+            applicationContext,
+            NotificationRelayService::class.java
+        )
+        NotificationRebindCoordinator(
+            schedule = { runnable, delayMillis ->
+                mainHandler.postDelayed(runnable, delayMillis)
+            },
+            cancelScheduled = mainHandler::removeCallbacks,
+            requestUnbind = ::requestUnbind,
+            requestRebind = { requestRebind(componentName) },
+            recordFailure = {
+                NotificationIngestionHealthStore.recordFailure(
+                    IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
+                )
+            },
+            delayMillis = REBIND_DELAY_MILLIS
+        )
+    }
+
     override fun onCreate() {
         super.onCreate()
         val reporter = NotificationIngestionHealthStore
         commandQueue = NotificationCommandQueue(
             scope = serviceScope,
             processor = NotificationCommandProcessor(repository, reporter),
-            healthReporter = reporter
+            healthReporter = reporter,
+            onOverflow = rebindCoordinator::request
         )
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        val currentNotifications = runCatching {
-            activeNotifications?.toList().orEmpty()
-        }.getOrElse {
-            NotificationIngestionHealthStore.recordFailure(IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED)
-            return
-        }
-
-        val activeKeys = currentNotifications
-            .asSequence()
-            .filterNot { it.packageName == packageName }
-            .map(StatusBarNotification::getKey)
-            .toSet()
-        val records = currentNotifications.mapNotNull(::createRecordSafely)
-        commandQueue.submit(
-            NotificationCommand.SynchronizeActive(
-                activeKeys = activeKeys,
-                notifications = records,
-                synchronizedAtMillis = clock.millis()
-            )
-        )
+        rebindCoordinator.markConnected()
+        synchronizeCurrentNotifications()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -91,6 +99,31 @@ class NotificationRelayService : NotificationListenerService() {
         super.onDestroy()
     }
 
+    private fun synchronizeCurrentNotifications() {
+        val currentNotifications = runCatching {
+            activeNotifications?.toList().orEmpty()
+        }.getOrElse {
+            NotificationIngestionHealthStore.recordFailure(
+                IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
+            )
+            return
+        }
+
+        val activeKeys = currentNotifications
+            .asSequence()
+            .filterNot { it.packageName == packageName }
+            .map(StatusBarNotification::getKey)
+            .toSet()
+        val records = currentNotifications.mapNotNull(::createRecordSafely)
+        commandQueue.submit(
+            NotificationCommand.SynchronizeActive(
+                activeKeys = activeKeys,
+                notifications = records,
+                synchronizedAtMillis = clock.millis()
+            )
+        )
+    }
+
     private fun createRecordSafely(sbn: StatusBarNotification): NotificationRecord? {
         if (sbn.packageName == packageName) return null
         return try {
@@ -101,5 +134,9 @@ class NotificationRelayService : NotificationListenerService() {
             )
             null
         }
+    }
+
+    companion object {
+        private const val REBIND_DELAY_MILLIS = 250L
     }
 }
