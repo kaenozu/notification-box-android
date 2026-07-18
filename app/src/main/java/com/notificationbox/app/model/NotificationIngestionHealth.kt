@@ -4,7 +4,9 @@ enum class IngestionErrorCode {
     ACTIVE_SNAPSHOT_FAILED,
     RECORD_MAPPING_FAILED,
     REPOSITORY_OPERATION_FAILED,
-    COMMAND_QUEUE_CLOSED
+    COMMAND_QUEUE_OVERFLOW,
+    COMMAND_QUEUE_CLOSED,
+    REBIND_TIMEOUT
 }
 
 data class NotificationIngestionHealth(
