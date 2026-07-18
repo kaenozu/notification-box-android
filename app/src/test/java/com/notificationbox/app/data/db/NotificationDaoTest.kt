@@ -121,9 +121,15 @@ class NotificationDaoTest {
     }
 
     @Test
-    fun `maximum count removes oldest unpinned rows`() = runTest {
+    fun `maximum count removes oldest inactive unpinned rows`() = runTest {
         repeat(502) { index ->
-            dao.upsert(entity(key = "key-$index", postTimeMillis = index.toLong()))
+            dao.upsert(
+                entity(
+                    key = "key-$index",
+                    postTimeMillis = index.toLong(),
+                    isActive = false
+                )
+            )
         }
 
         dao.pruneToMaximum(500)
@@ -135,17 +141,30 @@ class NotificationDaoTest {
     }
 
     @Test
-    fun `maximum count prefers deleting inactive rows`() = runTest {
-        repeat(499) { index ->
+    fun `maximum count deletes inactive rows before preserving active rows`() = runTest {
+        repeat(500) { index ->
             dao.upsert(entity(key = "active-$index", postTimeMillis = index.toLong(), isActive = true))
         }
         dao.upsert(entity(key = "inactive", postTimeMillis = 10_000, isActive = false))
-        dao.upsert(entity(key = "old-active", postTimeMillis = -1, isActive = true))
 
         dao.pruneToMaximum(500)
 
+        assertEquals(500, dao.count())
         assertNull(dao.getByKey("inactive"))
-        assertTrue(dao.getByKey("old-active") != null)
+        assertTrue(dao.getByKey("active-0") != null)
+    }
+
+    @Test
+    fun `maximum count never deletes active notifications`() = runTest {
+        repeat(501) { index ->
+            dao.upsert(entity(key = "active-$index", postTimeMillis = index.toLong(), isActive = true))
+        }
+
+        dao.pruneToMaximum(500)
+
+        assertEquals(501, dao.count())
+        assertTrue(dao.getByKey("active-0") != null)
+        assertTrue(dao.getByKey("active-500") != null)
     }
 
     private fun entity(
