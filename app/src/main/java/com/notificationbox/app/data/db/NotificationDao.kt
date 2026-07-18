@@ -89,7 +89,8 @@ interface NotificationDao {
             SELECT `key`
             FROM notifications
             WHERE userPinned = 0
-            ORDER BY isActive ASC, postTimeMillis ASC, `key` ASC
+              AND isActive = 0
+            ORDER BY postTimeMillis ASC, `key` ASC
             LIMIT MAX((SELECT COUNT(*) FROM notifications) - :maxCount, 0)
         )
         """
