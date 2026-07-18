@@ -22,26 +22,33 @@ import com.notificationbox.app.service.NotificationIngestionHealthStore
 import java.time.Clock
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
 
 data class NotificationHistoryUiState(
     val items: List<NotificationItem> = emptyList(),
     val selectedFilter: NotificationDecision? = null,
     val notificationAccessGranted: Boolean = false,
-    val ingestionHealth: NotificationIngestionHealth = NotificationIngestionHealth()
+    val ingestionHealth: NotificationIngestionHealth = NotificationIngestionHealth(),
+    val readFailed: Boolean = false
 )
 
 data class SettingsRulesUiState(
     val settings: AppSettings = AppSettings(),
     val appRules: List<AppRule> = emptyList(),
-    val classificationStats: ClassificationStats = ClassificationStats()
+    val classificationStats: ClassificationStats = ClassificationStats(),
+    val readFailed: Boolean = false
 )
 
 class NotificationBoxViewModel(
@@ -68,8 +75,13 @@ class NotificationBoxViewModel(
     private val mutableOperationMessage = MutableStateFlow<String?>(null)
     val operationMessage: StateFlow<String?> = mutableOperationMessage.asStateFlow()
 
+    private val notificationReadFailed = MutableStateFlow(false)
+    private val appRulesReadFailed = MutableStateFlow(false)
+    private val classificationStatsReadFailed = MutableStateFlow(false)
+
     private val notifications: StateFlow<List<NotificationItem>> =
         notificationRepository.observeNotifications()
+            .withReadRecovery(notificationReadFailed)
             .map { items -> items.map(notificationContentPresenter::present) }
             .stateIn(
                 viewModelScope,
@@ -77,17 +89,37 @@ class NotificationBoxViewModel(
                 emptyList()
             )
 
+    private val appRules: StateFlow<List<AppRule>> =
+        notificationRepository.observeAppRules()
+            .withReadRecovery(appRulesReadFailed)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                emptyList()
+            )
+
+    private val classificationStats: StateFlow<ClassificationStats> =
+        notificationRepository.observeClassificationStats()
+            .withReadRecovery(classificationStatsReadFailed)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                ClassificationStats()
+            )
+
     val historyState: StateFlow<NotificationHistoryUiState> = combine(
         notifications,
         settingsRepository.settings,
         notificationAccessGranted,
-        ingestionHealth
-    ) { items, settings, listenerGranted, health ->
+        ingestionHealth,
+        notificationReadFailed
+    ) { items, settings, listenerGranted, health, readFailed ->
         NotificationHistoryUiState(
             items = items,
             selectedFilter = settings.selectedFilter,
             notificationAccessGranted = listenerGranted,
-            ingestionHealth = health
+            ingestionHealth = health,
+            readFailed = readFailed
         )
     }.stateIn(
         viewModelScope,
@@ -97,13 +129,16 @@ class NotificationBoxViewModel(
 
     val settingsRulesState: StateFlow<SettingsRulesUiState> = combine(
         settingsRepository.settings,
-        notificationRepository.observeAppRules(),
-        notificationRepository.observeClassificationStats()
-    ) { settings, appRules, stats ->
+        appRules,
+        classificationStats,
+        appRulesReadFailed,
+        classificationStatsReadFailed
+    ) { settings, currentRules, stats, rulesFailed, statsFailed ->
         SettingsRulesUiState(
             settings = settings,
-            appRules = appRules,
-            classificationStats = stats
+            appRules = currentRules,
+            classificationStats = stats,
+            readFailed = rulesFailed || statsFailed
         )
     }.stateIn(
         viewModelScope,
@@ -249,6 +284,25 @@ class NotificationBoxViewModel(
         mutableOperationMessage.value = null
     }
 
+    private fun <T> Flow<T>.withReadRecovery(
+        failureState: MutableStateFlow<Boolean>
+    ): Flow<T> =
+        onEach { failureState.value = false }
+            .retryWhen { error, attempt ->
+                if (error is CancellationException) {
+                    false
+                } else {
+                    failureState.value = true
+                    delay(readRetryDelayMillis(attempt))
+                    true
+                }
+            }
+
+    private fun readRetryDelayMillis(attempt: Long): Long {
+        val exponent = attempt.coerceAtMost(MAX_READ_RETRY_EXPONENT.toLong()).toInt()
+        return (READ_RETRY_BASE_MILLIS shl exponent).coerceAtMost(READ_RETRY_MAX_MILLIS)
+    }
+
     private fun launchOperation(
         failureMessage: String,
         operation: suspend () -> Unit
@@ -262,6 +316,12 @@ class NotificationBoxViewModel(
                 mutableOperationMessage.value = failureMessage
             }
         }
+    }
+
+    private companion object {
+        const val READ_RETRY_BASE_MILLIS = 250L
+        const val READ_RETRY_MAX_MILLIS = 5_000L
+        const val MAX_READ_RETRY_EXPONENT = 4
     }
 }
 
