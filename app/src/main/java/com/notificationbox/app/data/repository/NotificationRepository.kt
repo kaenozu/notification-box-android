@@ -8,6 +8,7 @@ import com.notificationbox.app.model.NotificationItem
 import com.notificationbox.app.model.NotificationSummary
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 data class NotificationRecord(
     val key: String,
@@ -34,7 +35,11 @@ interface NotificationRepository : NotificationSummarySource {
 
     fun observeClassificationStats(): Flow<ClassificationStats>
 
-    override fun observeSummarySince(since: Instant): Flow<NotificationSummary>
+    // Existing narrow test doubles remain source-compatible; production and shared fakes override this.
+    override fun observeSummarySince(since: Instant): Flow<NotificationSummary> =
+        flow {
+            throw UnsupportedOperationException("Summary observation is not implemented")
+        }
 
     suspend fun upsert(notification: NotificationRecord)
 
