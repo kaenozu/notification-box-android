@@ -10,9 +10,11 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -43,7 +45,7 @@ class NotificationSummaryDaoTest {
 
     @Test
     fun `empty database emits zero counts`() = runTest {
-        val summary = dao.observeSummarySince(sinceMillis = 0).firstValue()
+        val summary = dao.observeSummarySince(sinceMillis = 0).first()
 
         assertEquals(0, summary.totalCount)
         assertEquals(0, summary.keepNowCount)
@@ -58,7 +60,7 @@ class NotificationSummaryDaoTest {
         dao.upsert(entity("digest-b", 1_200, "HoldForDigest"))
         dao.upsert(entity("ignore", 1_300, "Ignore", userDecision = "KeepNow"))
 
-        val summary = dao.observeSummarySince(sinceMillis = 1_000).firstValue()
+        val summary = dao.observeSummarySince(sinceMillis = 1_000).first()
 
         assertEquals(4, summary.totalCount)
         assertEquals(1, summary.keepNowCount)
@@ -72,7 +74,7 @@ class NotificationSummaryDaoTest {
         dao.upsert(entity("boundary", 1_000, "HoldForDigest"))
         dao.upsert(entity("after", 1_001, "Ignore"))
 
-        val summary = dao.observeSummarySince(sinceMillis = 1_000).firstValue()
+        val summary = dao.observeSummarySince(sinceMillis = 1_000).first()
 
         assertEquals(2, summary.totalCount)
         assertEquals(0, summary.keepNowCount)
@@ -93,17 +95,14 @@ class NotificationSummaryDaoTest {
                 }
         }
 
-        firstEmissionReceived.await()
+        withTimeout(5_000) { firstEmissionReceived.await() }
         dao.upsert(entity("new", 1_000, "KeepNow"))
-        collection.join()
+        withTimeout(5_000) { collection.join() }
 
         assertEquals(0, emissions.first().totalCount)
         assertEquals(1, emissions.last().totalCount)
         assertEquals(1, emissions.last().keepNowCount)
     }
-
-    private suspend fun kotlinx.coroutines.flow.Flow<NotificationSummaryRow>.firstValue():
-        NotificationSummaryRow = kotlinx.coroutines.flow.first(this)
 
     private fun entity(
         key: String,
