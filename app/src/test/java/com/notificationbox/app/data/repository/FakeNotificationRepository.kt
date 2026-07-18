@@ -5,11 +5,16 @@ import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.DecisionSource
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.model.NotificationSummary
+import java.time.Clock
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
-class FakeNotificationRepository : NotificationRepository {
+class FakeNotificationRepository(
+    private val clock: Clock = Clock.systemUTC()
+) : NotificationRepository {
     private val items = MutableStateFlow<List<NotificationItem>>(emptyList())
     private val rules = MutableStateFlow<List<AppRule>>(emptyList())
     private val stats = MutableStateFlow(ClassificationStats())
@@ -30,6 +35,25 @@ class FakeNotificationRepository : NotificationRepository {
     override fun observeAppRules(): Flow<List<AppRule>> = rules
 
     override fun observeClassificationStats(): Flow<ClassificationStats> = stats
+
+    override fun observeSummarySince(since: Instant): Flow<NotificationSummary> =
+        items.map { currentItems ->
+            val recent = currentItems.filterNot { item -> item.postTime.isBefore(since) }
+            NotificationSummary(
+                totalCount = recent.size,
+                keepNowCount = recent.count {
+                    it.automaticDecision == NotificationDecision.KeepNow
+                },
+                holdForDigestCount = recent.count {
+                    it.automaticDecision == NotificationDecision.HoldForDigest
+                },
+                ignoreCount = recent.count {
+                    it.automaticDecision == NotificationDecision.Ignore
+                },
+                periodStart = since,
+                generatedAt = clock.instant()
+            )
+        }
 
     override suspend fun upsert(notification: NotificationRecord) {
         items.value = upsertInto(items.value, notification)
