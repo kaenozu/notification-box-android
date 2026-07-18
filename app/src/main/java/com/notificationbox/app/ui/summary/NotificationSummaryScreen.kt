@@ -33,14 +33,14 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal object NotificationSummaryTestTags {
-    const val Loading = "notification_summary_loading"
-    const val Empty = "notification_summary_empty"
-    const val Error = "notification_summary_error"
-    const val Content = "notification_summary_content"
-    const val TotalCard = "notification_summary_total_card"
-    const val KeepNowCard = "notification_summary_keep_now_card"
-    const val HoldForDigestCard = "notification_summary_hold_for_digest_card"
-    const val IgnoreCard = "notification_summary_ignore_card"
+    const val LOADING = "notification_summary_loading"
+    const val EMPTY = "notification_summary_empty"
+    const val ERROR = "notification_summary_error"
+    const val CONTENT = "notification_summary_content"
+    const val TOTAL_CARD = "notification_summary_total_card"
+    const val KEEP_NOW_CARD = "notification_summary_keep_now_card"
+    const val HOLD_FOR_DIGEST_CARD = "notification_summary_hold_for_digest_card"
+    const val IGNORE_CARD = "notification_summary_ignore_card"
 }
 
 @Composable
@@ -66,7 +66,7 @@ fun NotificationSummaryScreen(
                 modifier = modifier
                     .fillMaxWidth()
                     .heightIn(min = 160.dp)
-                    .testTag(NotificationSummaryTestTags.Loading),
+                    .testTag(NotificationSummaryTestTags.LOADING),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -77,7 +77,7 @@ fun NotificationSummaryScreen(
             MessageCard(
                 title = stringResource(R.string.notification_summary_empty_title),
                 message = stringResource(R.string.notification_summary_empty_body),
-                modifier = modifier.testTag(NotificationSummaryTestTags.Empty)
+                modifier = modifier.testTag(NotificationSummaryTestTags.EMPTY)
             )
         }
 
@@ -85,14 +85,14 @@ fun NotificationSummaryScreen(
             MessageCard(
                 title = stringResource(R.string.notification_summary_error_title),
                 message = stringResource(R.string.notification_summary_error_body),
-                modifier = modifier.testTag(NotificationSummaryTestTags.Error)
+                modifier = modifier.testTag(NotificationSummaryTestTags.ERROR)
             )
         }
 
         is NotificationSummaryUiState.Content -> {
             SummaryContent(
                 summary = uiState.summary,
-                modifier = modifier.testTag(NotificationSummaryTestTags.Content)
+                modifier = modifier.testTag(NotificationSummaryTestTags.CONTENT)
             )
         }
     }
@@ -126,25 +126,25 @@ private fun SummaryContent(
             title = stringResource(R.string.notification_summary_total_title),
             count = summary.totalCount,
             description = stringResource(R.string.notification_summary_total_description),
-            testTag = NotificationSummaryTestTags.TotalCard
+            testTag = NotificationSummaryTestTags.TOTAL_CARD
         )
         SummaryMetricCard(
             title = stringResource(R.string.notification_summary_keep_title),
             count = summary.keepNowCount,
             description = stringResource(R.string.notification_summary_keep_description),
-            testTag = NotificationSummaryTestTags.KeepNowCard
+            testTag = NotificationSummaryTestTags.KEEP_NOW_CARD
         )
         SummaryMetricCard(
             title = stringResource(R.string.notification_summary_digest_title),
             count = summary.holdForDigestCount,
             description = stringResource(R.string.notification_summary_digest_description),
-            testTag = NotificationSummaryTestTags.HoldForDigestCard
+            testTag = NotificationSummaryTestTags.HOLD_FOR_DIGEST_CARD
         )
         SummaryMetricCard(
             title = stringResource(R.string.notification_summary_ignore_title),
             count = summary.ignoreCount,
             description = stringResource(R.string.notification_summary_ignore_description),
-            testTag = NotificationSummaryTestTags.IgnoreCard
+            testTag = NotificationSummaryTestTags.IGNORE_CARD
         )
         Text(
             text = stringResource(R.string.notification_summary_automatic_note),
