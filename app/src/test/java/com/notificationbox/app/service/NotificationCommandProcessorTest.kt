@@ -8,6 +8,8 @@ import com.notificationbox.app.model.IngestionErrorCode
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationIngestionHealth
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.model.NotificationSummary
+import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -98,7 +100,7 @@ class NotificationCommandProcessorTest {
 
         assertEquals(1, reconciliationRequests)
         assertEquals(1L, health.health.value.failedCommands)
-        assertEquals(IngestionErrorCode.REPOSITORY_OPERATION_FAILED, health.health.value.lastError)
+        assertEquals(IngestionErrorCode.COMMAND_QUEUE_OVERFLOW, health.health.value.lastError)
 
         release.complete(Unit)
         advanceUntilIdle()
@@ -187,6 +189,18 @@ class NotificationCommandProcessorTest {
 
         override fun observeClassificationStats(): Flow<ClassificationStats> =
             MutableStateFlow(ClassificationStats())
+
+        override fun observeSummarySince(since: Instant): Flow<NotificationSummary> =
+            MutableStateFlow(
+                NotificationSummary(
+                    totalCount = 0,
+                    keepNowCount = 0,
+                    holdForDigestCount = 0,
+                    ignoreCount = 0,
+                    periodStart = since,
+                    generatedAt = since
+                )
+            )
 
         override suspend fun upsert(notification: NotificationRecord) {
             beforeUpsert()
