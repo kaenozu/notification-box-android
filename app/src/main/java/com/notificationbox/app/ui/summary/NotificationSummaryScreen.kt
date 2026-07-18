@@ -26,6 +26,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 internal object NotificationSummaryTestTags {
     const val LOADING = "notification_summary_loading"
@@ -44,7 +45,10 @@ fun NotificationSummaryRoute(
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(viewModel) {
-        viewModel.refresh()
+        while (true) {
+            viewModel.refresh()
+            delay(SUMMARY_REFRESH_INTERVAL_MILLIS)
+        }
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     NotificationSummaryScreen(uiState = uiState, modifier = modifier)
@@ -203,3 +207,5 @@ private fun Instant.displayTimestamp(): String =
     DateTimeFormatter.ofPattern("M/d HH:mm", Locale.getDefault())
         .withZone(ZoneId.systemDefault())
         .format(this)
+
+private const val SUMMARY_REFRESH_INTERVAL_MILLIS = 60_000L
