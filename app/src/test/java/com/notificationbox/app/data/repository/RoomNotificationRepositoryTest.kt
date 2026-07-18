@@ -200,7 +200,7 @@ class RoomNotificationRepositoryTest {
             database.notificationDao().upsert(
                 entity(
                     key = "key-$index",
-                    postTimeMillis = index.toLong(),
+                    postTimeMillis = nowMillis - RoomNotificationRepository.MAX_NOTIFICATION_COUNT + index,
                     isActive = false
                 )
             )
