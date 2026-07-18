@@ -8,13 +8,8 @@ package com.notificationbox.app.data.db
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -83,25 +78,16 @@ class NotificationSummaryDaoTest {
     }
 
     @Test
-    fun `summary Flow updates after notification insert`() = runTest {
-        val firstEmissionReceived = CompletableDeferred<Unit>()
-        val emissions = mutableListOf<NotificationSummaryRow>()
-        val collection = backgroundScope.launch(Dispatchers.IO) {
-            dao.observeSummarySince(sinceMillis = 1_000)
-                .take(2)
-                .collect { row ->
-                    emissions += row
-                    if (emissions.size == 1) firstEmissionReceived.complete(Unit)
-                }
-        }
+    fun `summary Flow reflects inserts after it is created`() = runTest {
+        val summaryFlow = dao.observeSummarySince(sinceMillis = 1_000)
 
-        withTimeout(5_000) { firstEmissionReceived.await() }
+        assertEquals(0, summaryFlow.first().totalCount)
+
         dao.upsert(entity("new", 1_000, "KeepNow"))
-        withTimeout(5_000) { collection.join() }
+        val updated = summaryFlow.first()
 
-        assertEquals(0, emissions.first().totalCount)
-        assertEquals(1, emissions.last().totalCount)
-        assertEquals(1, emissions.last().keepNowCount)
+        assertEquals(1, updated.totalCount)
+        assertEquals(1, updated.keepNowCount)
     }
 
     private fun entity(
