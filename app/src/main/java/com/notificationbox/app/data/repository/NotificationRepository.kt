@@ -27,14 +27,14 @@ data class NotificationRecord(
     val removedAtMillis: Long? = null
 )
 
-interface NotificationRepository {
+interface NotificationRepository : NotificationSummarySource {
     fun observeNotifications(): Flow<List<NotificationItem>>
 
     fun observeAppRules(): Flow<List<AppRule>>
 
     fun observeClassificationStats(): Flow<ClassificationStats>
 
-    fun observeSummarySince(since: Instant): Flow<NotificationSummary>
+    override fun observeSummarySince(since: Instant): Flow<NotificationSummary>
 
     suspend fun upsert(notification: NotificationRecord)
 
