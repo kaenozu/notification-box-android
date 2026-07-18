@@ -55,11 +55,11 @@ class NotificationSafetySourceTest {
                     """\.toString\s*\("""
             ),
             Regex(
-                """\$\{\s*(?:sbn|statusBarNotification|extras|notificationRecord|notificationEntity)""" +
+                """\${'$'}\{\s*(?:sbn|statusBarNotification|extras|notificationRecord|notificationEntity)""" +
                     """\s*}"""
             ),
             Regex(
-                """\$(?:sbn|statusBarNotification|extras|notificationRecord|notificationEntity)\b"""
+                """\${'$'}(?:sbn|statusBarNotification|extras|notificationRecord|notificationEntity)\b"""
             ),
             Regex("""\bBundle\.toString\s*\(""")
         )
