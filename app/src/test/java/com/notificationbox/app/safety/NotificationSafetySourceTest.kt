@@ -53,7 +53,7 @@ class NotificationSafetySourceTest {
             val lines = Files.readAllLines(path)
             val source = lines.joinToString("\n")
             val identifiers = sensitiveCarrierIdentifiers(source)
-            val patterns = identifiers.flatMap(::stringificationPatterns)
+            val patterns = identifiers.flatMap(::stringificationPatterns) + inlineCarrierPatterns()
 
             lines.mapIndexedNotNull { index, line ->
                 if (patterns.any { pattern -> pattern.containsMatchIn(line) }) {
@@ -84,7 +84,7 @@ class NotificationSafetySourceTest {
         // Capture parameters and properties even when their names differ from repository conventions.
         Regex(
             """\b([A-Za-z_]\w*)\s*:\s*(?:[A-Za-z_]\w*\.)?""" +
-                """(?:StatusBarNotification|Bundle|NotificationRecord|NotificationEntity)\??\b"""
+                """(?:StatusBarNotification|Bundle|NotificationRecord|NotificationEntity)\b\??"""
         ).findAll(source).forEach { match ->
             identifiers += match.groupValues[1]
         }
@@ -107,16 +107,25 @@ class NotificationSafetySourceTest {
 
     private fun stringificationPatterns(identifier: String): List<Regex> {
         val name = Regex.escape(identifier)
-        val propertyChain = "(?:\\.[A-Za-z_]\\w*)*"
         return listOf(
-            Regex("""\b$name$propertyChain\.toString\s*\("""),
-            Regex("""\${'$'}\{\s*$name$propertyChain\s*}"""),
+            Regex("""\b$name\.toString\s*\("""),
+            Regex("""\${'$'}\{\s*$name\s*}"""),
             Regex("""\${'$'}$name\b"""),
-            Regex("""\b(?:String\.valueOf|Objects\.toString)\s*\(\s*$name$propertyChain\b"""),
-            Regex("""\.append\s*\(\s*$name$propertyChain\b"""),
+            Regex("""\b(?:String\.valueOf|Objects\.toString)\s*\(\s*$name\b"""),
+            Regex("""\.append\s*\(\s*$name\b"""),
             Regex("""(?:\+\s*$name\b|\b$name\s*\+)""")
         )
     }
+
+    private fun inlineCarrierPatterns(): List<Regex> = listOf(
+        Regex("""\bBundle\.toString\s*\("""),
+        Regex("""\.extras\.toString\s*\("""),
+        Regex("""\${'$'}\{\s*[^}]*\.extras\s*}"""),
+        Regex(
+            """\b(?:StatusBarNotification|Bundle|NotificationRecord|NotificationEntity)""" +
+                """\s*\([^)]*\)\s*\.toString\s*\("""
+        )
+    )
 
     private fun findInProductionSources(patterns: List<Regex>): List<String> =
         productionKotlinFiles().flatMap { path ->
