@@ -34,13 +34,40 @@ class NotificationSafetySourceTest {
             Regex("""\bLog\.(?:v|d|i|w|e|wtf)\s*\("""),
             Regex("""\bTimber\."""),
             Regex("""\bprintStackTrace\s*\("""),
-            Regex("""\b(?:print|println)\s*\(""")
+            Regex("""\b(?:print|println)\s*\("""),
+            Regex("""\bSystem\.(?:out|err)\.""")
         )
 
         val findings = findInProductionSources(directLogging)
 
         assertTrue(
             "Direct production logging is prohibited because notification title/body may be in scope:\n" +
+                findings.joinToString("\n"),
+            findings.isEmpty()
+        )
+    }
+
+    @Test
+    fun `production sources do not stringify notification carriers`() {
+        val sensitiveCarrierStringification = listOf(
+            Regex(
+                """\b(?:sbn|statusBarNotification|extras|notificationRecord|notificationEntity)""" +
+                    """\.toString\s*\("""
+            ),
+            Regex(
+                """\$\{\s*(?:sbn|statusBarNotification|extras|notificationRecord|notificationEntity)""" +
+                    """\s*}"""
+            ),
+            Regex(
+                """\$(?:sbn|statusBarNotification|extras|notificationRecord|notificationEntity)\b"""
+            ),
+            Regex("""\bBundle\.toString\s*\(""")
+        )
+
+        val findings = findInProductionSources(sensitiveCarrierStringification)
+
+        assertTrue(
+            "Notification carriers must not be stringified into logs or exception messages:\n" +
                 findings.joinToString("\n"),
             findings.isEmpty()
         )
