@@ -34,7 +34,9 @@ fun NotificationHomeScreen(
     notificationViewModel: NotificationBoxViewModel,
     summaryViewModel: NotificationSummaryViewModel
 ) {
-    var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
+    var selectedIndex by rememberSaveable {
+        mutableIntStateOf(RootDestination.Summary.ordinal)
+    }
     val selected = RootDestination.entries[selectedIndex]
 
     Scaffold(
