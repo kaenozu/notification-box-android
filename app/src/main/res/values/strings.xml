@@ -37,8 +37,13 @@
     <string name="notification_error_snapshot">現在の通知一覧を取得できませんでした</string>
     <string name="notification_error_mapping">一部の通知を読み取れませんでした</string>
     <string name="notification_error_repository">端末内への保存に失敗しました</string>
+    <string name="notification_error_queue_overflow">通知が集中したため取込キューが上限に達しました</string>
     <string name="notification_error_queue_closed">通知取込の終了処理中に新しい通知を受け取りました</string>
+    <string name="notification_error_rebind_timeout">通知アクセスの再接続を確認できませんでした</string>
     <string name="notification_error_unknown">詳細不明</string>
+
+    <string name="notification_read_recovery_title">端末内データを再読み込みしています</string>
+    <string name="notification_read_recovery_body">通知履歴、アプリ別ルール、または分類統計を一時的に読み込めませんでした。安全のため現在の表示を維持し、自動的に再試行します。</string>
 
     <string name="notification_safety_title">安全な観察・試算版</string>
     <string name="notification_safety_body">このバージョンは元のOS通知を削除、抑制、スヌーズ、遅延しません。分類と整理プレビューだけを行います。</string>
@@ -98,7 +103,7 @@
 
     <string name="notification_privacy_storage">通知の送信元、タイトル、本文、時刻、分類結果を端末内だけに保存します。</string>
     <string name="notification_privacy_network">外部APIやクラウドへ送信せず、Androidバックアップも無効です。</string>
-    <string name="notification_privacy_retention">非アクティブでピン留めされていない7日超の履歴を整理し、履歴は原則500件を上限とします。</string>
+    <string name="notification_privacy_retention">非アクティブでピン留めされていない7日超の履歴を整理し、履歴は原則500件を上限とします。アクティブな通知は上限整理から除外します。</string>
     <string name="notification_privacy_os_boundary">このバージョンは元のOS通知を変更しません。</string>
 
     <string name="notification_decision_keep">優先</string>
