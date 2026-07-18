@@ -10,6 +10,28 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications ORDER BY postTimeMillis DESC, `key` DESC")
     fun observeAll(): Flow<List<NotificationEntity>>
 
+    @Query(
+        """
+        SELECT
+            COUNT(*) AS totalCount,
+            COALESCE(
+                SUM(CASE WHEN category = 'KeepNow' THEN 1 ELSE 0 END),
+                0
+            ) AS keepNowCount,
+            COALESCE(
+                SUM(CASE WHEN category = 'HoldForDigest' THEN 1 ELSE 0 END),
+                0
+            ) AS holdForDigestCount,
+            COALESCE(
+                SUM(CASE WHEN category = 'Ignore' THEN 1 ELSE 0 END),
+                0
+            ) AS ignoreCount
+        FROM notifications
+        WHERE postTimeMillis >= :sinceMillis
+        """
+    )
+    fun observeSummarySince(sinceMillis: Long): Flow<NotificationSummaryRow>
+
     @Query("SELECT * FROM notifications WHERE `key` = :key LIMIT 1")
     suspend fun getByKey(key: String): NotificationEntity?
 
