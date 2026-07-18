@@ -1,8 +1,3 @@
-/*
- * File: app/src/main/java/com/notificationbox/app/ui/summary/NotificationSummaryUiState.kt
- * Description: Exhaustive UI states for the notification-summary screen.
- * Related: NotificationSummaryViewModel.kt, NotificationSummaryScreen.kt, NotificationSummary.kt
- */
 package com.notificationbox.app.ui.summary
 
 import com.notificationbox.app.model.NotificationSummary
