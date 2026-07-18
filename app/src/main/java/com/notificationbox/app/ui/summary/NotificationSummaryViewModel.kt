@@ -1,8 +1,3 @@
-/*
- * File: app/src/main/java/com/notificationbox/app/ui/summary/NotificationSummaryViewModel.kt
- * Description: Produces a reactive 24-hour notification-summary StateFlow.
- * Related: NotificationSummaryUiState.kt, NotificationRepository.kt, NotificationSummaryScreen.kt
- */
 package com.notificationbox.app.ui.summary
 
 import androidx.lifecycle.ViewModel
