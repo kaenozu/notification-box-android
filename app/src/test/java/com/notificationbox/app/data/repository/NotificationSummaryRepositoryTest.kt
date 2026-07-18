@@ -1,77 +1,113 @@
+/*
+ * File: app/src/test/java/com/notificationbox/app/data/repository/NotificationSummaryRepositoryTest.kt
+ * Description: Verifies Room aggregate rows are mapped to the summary domain model.
+ * Related: RoomNotificationRepository.kt, NotificationDao.kt, NotificationSummary.kt
+ */
 package com.notificationbox.app.data.repository
 
-import com.notificationbox.app.model.DecisionSource
-import com.notificationbox.app.model.NotificationDecision
-import com.notificationbox.app.model.NotificationItem
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.notificationbox.app.data.db.NotificationDatabase
+import com.notificationbox.app.data.db.NotificationEntity
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class NotificationSummaryRepositoryTest {
-    private val now = Instant.parse("2026-07-17T00:00:00Z")
-    private val clock = Clock.fixed(now, ZoneOffset.UTC)
+    private lateinit var database: NotificationDatabase
+
+    @Before
+    fun setup() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        database = Room.inMemoryDatabaseBuilder(context, NotificationDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+    }
+
+    @After
+    fun teardown() {
+        database.close()
+    }
 
     @Test
-    fun `summary counts recent automatic decisions and ignores display overrides`() = runTest {
-        val repository = FakeNotificationRepository()
-        repository.emit(
-            listOf(
-                item(
-                    key = "keep",
-                    postTime = now.minus(Duration.ofHours(1)),
-                    automatic = NotificationDecision.KeepNow
-                ),
-                item(
-                    key = "overridden",
-                    postTime = now.minus(Duration.ofHours(2)),
-                    automatic = NotificationDecision.Ignore,
-                    effective = NotificationDecision.KeepNow,
-                    source = DecisionSource.UserOverride
-                ),
-                item(
-                    key = "old",
-                    postTime = now.minus(Duration.ofHours(25)),
-                    automatic = NotificationDecision.HoldForDigest
-                )
-            )
+    fun `Room summary row maps counts and timestamps to domain model`() = runTest {
+        val now = Instant.parse("2026-07-18T00:00:00Z")
+        val since = Instant.parse("2026-07-17T00:00:00Z")
+        database.notificationDao().upsert(entity("keep", since.toEpochMilli(), "KeepNow"))
+        database.notificationDao().upsert(
+            entity("digest", since.plusSeconds(1).toEpochMilli(), "HoldForDigest")
         )
-        val periodStart = now.minus(Duration.ofHours(24))
-        val source = NotificationSummaryRepository(repository, clock)
+        database.notificationDao().upsert(
+            entity("ignore", since.plusSeconds(2).toEpochMilli(), "Ignore")
+        )
+        database.notificationDao().upsert(
+            entity("old", since.minusMillis(1).toEpochMilli(), "KeepNow")
+        )
+        val repository = RoomNotificationRepository(
+            database = database,
+            clock = Clock.fixed(now, ZoneOffset.UTC)
+        )
 
-        val summary = source.observeSummarySince(periodStart).first()
+        val summary = repository.observeSummarySince(since).first()
 
-        assertEquals(2, summary.totalCount)
+        assertEquals(3, summary.totalCount)
         assertEquals(1, summary.keepNowCount)
-        assertEquals(0, summary.holdForDigestCount)
+        assertEquals(1, summary.holdForDigestCount)
         assertEquals(1, summary.ignoreCount)
-        assertEquals(periodStart, summary.periodStart)
+        assertEquals(since, summary.periodStart)
         assertEquals(now, summary.generatedAt)
     }
 
-    private fun item(
+    @Test
+    fun `repository emits zero summary for an empty database`() = runTest {
+        val now = Instant.parse("2026-07-18T00:00:00Z")
+        val since = now.minusSeconds(24 * 60 * 60)
+        val repository = RoomNotificationRepository(
+            database = database,
+            clock = Clock.fixed(now, ZoneOffset.UTC)
+        )
+
+        val summary = repository.observeSummarySince(since).first()
+
+        assertEquals(0, summary.totalCount)
+        assertEquals(0, summary.keepNowCount)
+        assertEquals(0, summary.holdForDigestCount)
+        assertEquals(0, summary.ignoreCount)
+        assertEquals(since, summary.periodStart)
+        assertEquals(now, summary.generatedAt)
+    }
+
+    private fun entity(
         key: String,
-        postTime: Instant,
-        automatic: NotificationDecision,
-        effective: NotificationDecision = automatic,
-        source: DecisionSource = DecisionSource.Automatic
-    ) = NotificationItem(
+        postTimeMillis: Long,
+        category: String
+    ) = NotificationEntity(
         key = key,
         packageName = "com.example.app",
         appLabel = "Example",
         title = "title",
         text = "text",
-        postTime = postTime,
-        automaticDecision = automatic,
-        userDecision = if (source == DecisionSource.UserOverride) effective else null,
-        appRuleDecision = null,
-        category = effective,
-        decisionSource = source,
-        automaticReason = "test",
-        reason = "test"
+        postTimeMillis = postTimeMillis,
+        notificationId = 1,
+        tag = null,
+        channelId = "channel",
+        category = category,
+        reason = "test",
+        userDecision = null,
+        userPinned = false,
+        isActive = true,
+        removedAtMillis = null
     )
 }

@@ -1,8 +1,11 @@
 package com.notificationbox.app.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.core.app.ApplicationProvider
+import java.io.IOException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,5 +59,28 @@ class NotificationPreferencesTest {
 
         preferences.saveOnboardingCompleted(true)
         assertTrue(preferences.observeState().first().onboardingCompleted)
+    }
+
+    @Test
+    fun `preference IO failure emits empty preferences`() = runTest {
+        val recovered = flow<Preferences> {
+            throw IOException("forced read failure")
+        }.recoverPreferenceRead().first()
+
+        assertTrue(recovered.asMap().isEmpty())
+    }
+
+    @Test
+    fun `non IO preference failure is rethrown`() = runTest {
+        var observed: Throwable? = null
+        try {
+            flow<Preferences> {
+                error("forced programming failure")
+            }.recoverPreferenceRead().first()
+        } catch (error: Throwable) {
+            observed = error
+        }
+
+        assertTrue(observed is IllegalStateException)
     }
 }

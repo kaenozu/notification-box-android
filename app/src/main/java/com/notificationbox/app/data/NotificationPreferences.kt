@@ -1,17 +1,30 @@
 package com.notificationbox.app.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.notificationbox.app.model.AppMode
 import com.notificationbox.app.model.DigestSchedule
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 private val Context.notificationPrefsDataStore by preferencesDataStore("notification_box_prefs")
+
+internal fun Flow<Preferences>.recoverPreferenceRead(): Flow<Preferences> =
+    catch { error ->
+        if (error is IOException) {
+            emit(emptyPreferences())
+        } else {
+            throw error
+        }
+    }
 
 data class NotificationPreferenceState(
     val mode: AppMode = AppMode.Observation,
@@ -35,33 +48,35 @@ class NotificationPreferences(context: Context) {
     )
 
     fun observeState(): Flow<NotificationPreferenceState> =
-        dataStore.data.map { prefs ->
-            val mode = prefs[modeKey]
-                ?.let { stored -> runCatching { AppMode.valueOf(stored) }.getOrNull() }
-                ?: AppMode.Observation
-            val defaultHours = DigestSchedule().hours
-            // Existing installations have no count key and historically persisted four slots.
-            val storedCount = prefs[digestHourCountKey]
-                ?.coerceIn(1, digestHourKeys.size)
-                ?: digestHourKeys.size
-            val digestHours = digestHourKeys
-                .take(storedCount)
-                .mapIndexed { index, key ->
-                    prefs[key] ?: defaultHours.getOrElse(index) { defaultHours.last() }
-                }
-                .filter { it in 0..23 }
-                .distinct()
-                .ifEmpty { defaultHours }
+        dataStore.data
+            .recoverPreferenceRead()
+            .map { prefs ->
+                val mode = prefs[modeKey]
+                    ?.let { stored -> runCatching { AppMode.valueOf(stored) }.getOrNull() }
+                    ?: AppMode.Observation
+                val defaultHours = DigestSchedule().hours
+                // Existing installations have no count key and historically persisted four slots.
+                val storedCount = prefs[digestHourCountKey]
+                    ?.coerceIn(1, digestHourKeys.size)
+                    ?: digestHourKeys.size
+                val digestHours = digestHourKeys
+                    .take(storedCount)
+                    .mapIndexed { index, key ->
+                        prefs[key] ?: defaultHours.getOrElse(index) { defaultHours.last() }
+                    }
+                    .filter { it in 0..23 }
+                    .distinct()
+                    .ifEmpty { defaultHours }
 
-            NotificationPreferenceState(
-                mode = mode,
-                onboardingCompleted = prefs[onboardingCompletedKey] ?: false,
-                pausedUntilText = prefs[pausedTextKey]
-                    ?.takeIf(String::isNotBlank)
-                    ?: "解除まで",
-                digestSchedule = DigestSchedule(digestHours)
-            )
-        }
+                NotificationPreferenceState(
+                    mode = mode,
+                    onboardingCompleted = prefs[onboardingCompletedKey] ?: false,
+                    pausedUntilText = prefs[pausedTextKey]
+                        ?.takeIf(String::isNotBlank)
+                        ?: "解除まで",
+                    digestSchedule = DigestSchedule(digestHours)
+                )
+            }
 
     suspend fun saveMode(mode: AppMode) {
         dataStore.edit { prefs ->

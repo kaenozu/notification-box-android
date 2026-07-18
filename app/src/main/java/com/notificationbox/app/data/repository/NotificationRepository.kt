@@ -5,6 +5,8 @@ import com.notificationbox.app.model.ClassificationStats
 import com.notificationbox.app.model.NotificationContentAvailability
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.model.NotificationSummary
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 data class NotificationRecord(
@@ -25,12 +27,14 @@ data class NotificationRecord(
     val removedAtMillis: Long? = null
 )
 
-interface NotificationRepository {
+interface NotificationRepository : NotificationSummarySource {
     fun observeNotifications(): Flow<List<NotificationItem>>
 
     fun observeAppRules(): Flow<List<AppRule>>
 
     fun observeClassificationStats(): Flow<ClassificationStats>
+
+    override fun observeSummarySince(since: Instant): Flow<NotificationSummary>
 
     suspend fun upsert(notification: NotificationRecord)
 

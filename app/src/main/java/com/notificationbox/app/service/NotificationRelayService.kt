@@ -50,7 +50,14 @@ class NotificationRelayService : NotificationListenerService() {
                     IngestionErrorCode.ACTIVE_SNAPSHOT_FAILED
                 )
             },
-            delayMillis = REBIND_DELAY_MILLIS
+            recordTimeout = {
+                NotificationIngestionHealthStore.recordFailure(
+                    IngestionErrorCode.REBIND_TIMEOUT
+                )
+            },
+            delayMillis = REBIND_DELAY_MILLIS,
+            connectionTimeoutMillis = REBIND_CONNECTION_TIMEOUT_MILLIS,
+            maxAttempts = REBIND_MAX_ATTEMPTS
         )
     }
 
@@ -87,6 +94,7 @@ class NotificationRelayService : NotificationListenerService() {
     }
 
     override fun onDestroy() {
+        rebindCoordinator.cancel()
         if (::commandQueue.isInitialized) {
             commandQueue.close()
             serviceScope.launch {
@@ -138,5 +146,7 @@ class NotificationRelayService : NotificationListenerService() {
 
     companion object {
         private const val REBIND_DELAY_MILLIS = 250L
+        private const val REBIND_CONNECTION_TIMEOUT_MILLIS = 5_000L
+        private const val REBIND_MAX_ATTEMPTS = 3
     }
 }

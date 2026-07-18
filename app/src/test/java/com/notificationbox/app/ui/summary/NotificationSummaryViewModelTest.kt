@@ -39,16 +39,18 @@ class NotificationSummaryViewModelTest {
     }
 
     @Test
-    fun `non-empty summary becomes content`() = runTest {
+    fun `loading becomes content for a non-empty summary`() = runTest {
         val summaries = MutableStateFlow(summary(total = 2))
         val viewModel = NotificationSummaryViewModel(
             summarySource = NotificationSummarySource { summaries },
             clock = Clock.fixed(now, ZoneOffset.UTC)
         )
+
+        assertEquals(NotificationSummaryUiState.Loading, viewModel.uiState.value)
+
         val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
         }
-
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -58,15 +60,17 @@ class NotificationSummaryViewModelTest {
     }
 
     @Test
-    fun `zero summary becomes empty`() = runTest {
+    fun `loading becomes empty for a zero summary`() = runTest {
         val viewModel = NotificationSummaryViewModel(
             summarySource = NotificationSummarySource { MutableStateFlow(summary(total = 0)) },
             clock = Clock.fixed(now, ZoneOffset.UTC)
         )
+
+        assertEquals(NotificationSummaryUiState.Loading, viewModel.uiState.value)
+
         val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
         }
-
         advanceUntilIdle()
 
         assertEquals(NotificationSummaryUiState.Empty, viewModel.uiState.value)
@@ -74,17 +78,19 @@ class NotificationSummaryViewModelTest {
     }
 
     @Test
-    fun `source failure becomes generic error`() = runTest {
+    fun `loading becomes error when the source fails`() = runTest {
         val viewModel = NotificationSummaryViewModel(
             summarySource = NotificationSummarySource {
                 flow { throw IllegalStateException("private diagnostic") }
             },
             clock = Clock.fixed(now, ZoneOffset.UTC)
         )
+
+        assertEquals(NotificationSummaryUiState.Loading, viewModel.uiState.value)
+
         val collection = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
         }
-
         advanceUntilIdle()
 
         assertEquals(NotificationSummaryUiState.Error, viewModel.uiState.value)

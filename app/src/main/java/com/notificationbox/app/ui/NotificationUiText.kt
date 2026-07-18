@@ -94,8 +94,14 @@ private fun IngestionErrorCode?.userMessage(): String = when (this) {
     IngestionErrorCode.REPOSITORY_OPERATION_FAILED ->
         stringResource(R.string.notification_error_repository)
 
+    IngestionErrorCode.COMMAND_QUEUE_OVERFLOW ->
+        stringResource(R.string.notification_error_queue_overflow)
+
     IngestionErrorCode.COMMAND_QUEUE_CLOSED ->
         stringResource(R.string.notification_error_queue_closed)
+
+    IngestionErrorCode.REBIND_TIMEOUT ->
+        stringResource(R.string.notification_error_rebind_timeout)
 
     null -> stringResource(R.string.notification_error_unknown)
 }

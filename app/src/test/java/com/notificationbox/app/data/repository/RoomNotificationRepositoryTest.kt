@@ -195,10 +195,14 @@ class RoomNotificationRepositoryTest {
     }
 
     @Test
-    fun `upsert enforces maximum count by deleting oldest unpinned row`() = runTest {
+    fun `upsert enforces maximum count by deleting oldest inactive unpinned row`() = runTest {
         repeat(RoomNotificationRepository.MAX_NOTIFICATION_COUNT) { index ->
             database.notificationDao().upsert(
-                entity(key = "key-$index", postTimeMillis = index.toLong())
+                entity(
+                    key = "key-$index",
+                    postTimeMillis = nowMillis - RoomNotificationRepository.MAX_NOTIFICATION_COUNT + index,
+                    isActive = false
+                )
             )
         }
 
@@ -206,6 +210,24 @@ class RoomNotificationRepositoryTest {
 
         assertEquals(RoomNotificationRepository.MAX_NOTIFICATION_COUNT, database.notificationDao().count())
         assertNull(database.notificationDao().getByKey("key-0"))
+        assertTrue(database.notificationDao().getByKey("new") != null)
+    }
+
+    @Test
+    fun `upsert allows count above maximum when every row is active`() = runTest {
+        repeat(RoomNotificationRepository.MAX_NOTIFICATION_COUNT) { index ->
+            database.notificationDao().upsert(
+                entity(key = "active-$index", postTimeMillis = index.toLong(), isActive = true)
+            )
+        }
+
+        repository.upsert(record(key = "new", postTimeMillis = nowMillis))
+
+        assertEquals(
+            RoomNotificationRepository.MAX_NOTIFICATION_COUNT + 1,
+            database.notificationDao().count()
+        )
+        assertTrue(database.notificationDao().getByKey("active-0") != null)
         assertTrue(database.notificationDao().getByKey("new") != null)
     }
 

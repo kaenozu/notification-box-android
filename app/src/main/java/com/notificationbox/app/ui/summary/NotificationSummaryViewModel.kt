@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.notificationbox.app.data.repository.NotificationRepository
-import com.notificationbox.app.data.repository.NotificationSummaryRepository
 import com.notificationbox.app.data.repository.NotificationSummarySource
 import com.notificationbox.app.model.NotificationSummary
 import java.time.Clock
@@ -53,14 +52,12 @@ class NotificationSummaryViewModel(
 }
 
 class NotificationSummaryViewModelFactory(
-    repository: NotificationRepository
+    private val repository: NotificationRepository
 ) : ViewModelProvider.Factory {
-    private val summarySource = NotificationSummaryRepository(repository)
-
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NotificationSummaryViewModel::class.java)) {
-            return NotificationSummaryViewModel(summarySource) as T
+            return NotificationSummaryViewModel(repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: " + modelClass.name)
     }
