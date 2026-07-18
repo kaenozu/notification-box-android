@@ -1,8 +1,3 @@
-/*
- * File: app/src/main/java/com/notificationbox/app/ui/summary/NotificationSummaryScreen.kt
- * Description: Material3 presentation for loading, empty, error, and summary content states.
- * Related: NotificationSummaryViewModel.kt, NotificationSummaryUiState.kt, NotificationHomeScreen.kt
- */
 package com.notificationbox.app.ui.summary
 
 import androidx.compose.foundation.layout.Arrangement
