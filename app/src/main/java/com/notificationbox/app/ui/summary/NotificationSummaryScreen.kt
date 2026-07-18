@@ -1,3 +1,8 @@
+/*
+ * File: app/src/main/java/com/notificationbox/app/ui/summary/NotificationSummaryScreen.kt
+ * Description: Material3 presentation for loading, empty, error, and summary content states.
+ * Related: NotificationSummaryViewModel.kt, NotificationSummaryUiState.kt, NotificationHomeScreen.kt
+ */
 package com.notificationbox.app.ui.summary
 
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,6 +31,17 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+internal object NotificationSummaryTestTags {
+    const val Loading = "notification_summary_loading"
+    const val Empty = "notification_summary_empty"
+    const val Error = "notification_summary_error"
+    const val Content = "notification_summary_content"
+    const val TotalCard = "notification_summary_total_card"
+    const val KeepNowCard = "notification_summary_keep_now_card"
+    const val HoldForDigestCard = "notification_summary_hold_for_digest_card"
+    const val IgnoreCard = "notification_summary_ignore_card"
+}
 
 @Composable
 fun NotificationSummaryRoute(
@@ -48,7 +65,8 @@ fun NotificationSummaryScreen(
             Box(
                 modifier = modifier
                     .fillMaxWidth()
-                    .heightIn(min = 160.dp),
+                    .heightIn(min = 160.dp)
+                    .testTag(NotificationSummaryTestTags.Loading),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -59,7 +77,7 @@ fun NotificationSummaryScreen(
             MessageCard(
                 title = stringResource(R.string.notification_summary_empty_title),
                 message = stringResource(R.string.notification_summary_empty_body),
-                modifier = modifier
+                modifier = modifier.testTag(NotificationSummaryTestTags.Empty)
             )
         }
 
@@ -67,12 +85,15 @@ fun NotificationSummaryScreen(
             MessageCard(
                 title = stringResource(R.string.notification_summary_error_title),
                 message = stringResource(R.string.notification_summary_error_body),
-                modifier = modifier
+                modifier = modifier.testTag(NotificationSummaryTestTags.Error)
             )
         }
 
         is NotificationSummaryUiState.Content -> {
-            SummaryContent(summary = uiState.summary, modifier = modifier)
+            SummaryContent(
+                summary = uiState.summary,
+                modifier = modifier.testTag(NotificationSummaryTestTags.Content)
+            )
         }
     }
 }
@@ -104,22 +125,26 @@ private fun SummaryContent(
         SummaryMetricCard(
             title = stringResource(R.string.notification_summary_total_title),
             count = summary.totalCount,
-            description = stringResource(R.string.notification_summary_total_description)
+            description = stringResource(R.string.notification_summary_total_description),
+            testTag = NotificationSummaryTestTags.TotalCard
         )
         SummaryMetricCard(
             title = stringResource(R.string.notification_summary_keep_title),
             count = summary.keepNowCount,
-            description = stringResource(R.string.notification_summary_keep_description)
+            description = stringResource(R.string.notification_summary_keep_description),
+            testTag = NotificationSummaryTestTags.KeepNowCard
         )
         SummaryMetricCard(
             title = stringResource(R.string.notification_summary_digest_title),
             count = summary.holdForDigestCount,
-            description = stringResource(R.string.notification_summary_digest_description)
+            description = stringResource(R.string.notification_summary_digest_description),
+            testTag = NotificationSummaryTestTags.HoldForDigestCard
         )
         SummaryMetricCard(
             title = stringResource(R.string.notification_summary_ignore_title),
             count = summary.ignoreCount,
-            description = stringResource(R.string.notification_summary_ignore_description)
+            description = stringResource(R.string.notification_summary_ignore_description),
+            testTag = NotificationSummaryTestTags.IgnoreCard
         )
         Text(
             text = stringResource(R.string.notification_summary_automatic_note),
@@ -133,10 +158,13 @@ private fun SummaryContent(
 private fun SummaryMetricCard(
     title: String,
     count: Int,
-    description: String
+    description: String,
+    testTag: String
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
