@@ -142,6 +142,8 @@
     <string name="payment_clear_body">通知から抽出した金額、店舗、種別の履歴を端末内から削除します。元の通知履歴とOS通知は変更しません。</string>
     <string name="payment_clear_action">決済履歴をすべて削除</string>
     <string name="payment_clear_failed">決済履歴を削除できませんでした。端末内ストレージの状態を確認して再度お試しください。</string>
+    <string name="payment_ingestion_warning_title">一部の決済通知を保存できませんでした</string>
+    <string name="payment_ingestion_warning_body">この起動中に累計%1$d件の問題を検出しました。通知本文は診断情報へ保存していません。通常の通知履歴は保存されています。</string>
 
     <string name="dry_run_preview_title">整理プレビュー（非実行）</string>
     <string name="dry_run_preview_active_count_short">表示中の通知 %1$d件を端末内で試算</string>
