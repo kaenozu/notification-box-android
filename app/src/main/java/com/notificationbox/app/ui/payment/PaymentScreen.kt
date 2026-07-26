@@ -296,6 +296,6 @@ private fun Long.asYen(): String =
     }.format(this)
 
 private fun java.time.Instant.displayTime(): String =
-    EVENT_TIME_FORMATTER.withZone(ZoneId.systemDefault()).format(this)
-
-private val EVENT_TIME_FORMATTER = DateTimeFormatter.ofPattern("M/d HH:mm", Locale.getDefault())
+    DateTimeFormatter.ofPattern("M/d HH:mm", Locale.getDefault())
+        .withZone(ZoneId.systemDefault())
+        .format(this)
