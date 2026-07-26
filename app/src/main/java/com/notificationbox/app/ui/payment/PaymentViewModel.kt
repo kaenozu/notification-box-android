@@ -54,11 +54,12 @@ class PaymentViewModel(
             repository.observeSummarySince(periodStart),
             healthReporter.health
         ) { events, summary, health ->
-            PaymentUiState.Content(
+            val content: PaymentUiState = PaymentUiState.Content(
                 events = events,
                 summary = summary,
                 ingestionHealth = health
             )
+            content
         }
             .catch { emit(PaymentUiState.Error) }
             .stateIn(
