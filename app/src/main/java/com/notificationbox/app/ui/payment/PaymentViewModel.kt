@@ -9,11 +9,15 @@ import com.notificationbox.app.data.repository.PaymentSummary
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 sealed interface PaymentUiState {
     data object Loading : PaymentUiState
@@ -27,7 +31,7 @@ sealed interface PaymentUiState {
 }
 
 class PaymentViewModel(
-    repository: PaymentRepository,
+    private val repository: PaymentRepository,
     clock: Clock = Clock.systemUTC(),
     zoneId: ZoneId = ZoneId.systemDefault()
 ) : ViewModel() {
@@ -35,6 +39,9 @@ class PaymentViewModel(
         .withDayOfMonth(1)
         .atStartOfDay(zoneId)
         .toInstant()
+    private val mutableClearFailed = MutableStateFlow(false)
+
+    val clearFailed: StateFlow<Boolean> = mutableClearFailed.asStateFlow()
 
     val uiState: StateFlow<PaymentUiState> =
         combine(
@@ -49,6 +56,23 @@ class PaymentViewModel(
                 SharingStarted.WhileSubscribed(5_000),
                 PaymentUiState.Loading
             )
+
+    fun clearAll() {
+        viewModelScope.launch {
+            mutableClearFailed.value = false
+            try {
+                repository.clearAll()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                mutableClearFailed.value = true
+            }
+        }
+    }
+
+    fun consumeClearFailure() {
+        mutableClearFailed.value = false
+    }
 }
 
 class PaymentViewModelFactory(
