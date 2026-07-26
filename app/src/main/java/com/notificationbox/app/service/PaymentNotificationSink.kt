@@ -17,7 +17,8 @@ object NoOpPaymentNotificationSink : PaymentNotificationSink {
 
 class PaymentNotificationIngestor(
     private val repository: PaymentRepository,
-    private val parserRegistry: PaymentParserRegistry = PaymentParserRegistry()
+    private val parserRegistry: PaymentParserRegistry = PaymentParserRegistry(),
+    private val healthReporter: PaymentIngestionHealthReporter = PaymentIngestionHealthStore
 ) : PaymentNotificationSink {
     override suspend fun capture(notification: NotificationRecord) {
         val parsed = parserRegistry.parse(
@@ -45,10 +46,12 @@ class PaymentNotificationIngestor(
                     confidencePercent = parsed.confidencePercent
                 )
             )
+            healthReporter.recordSuccess()
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
-            // Payment parsing is additive. A failure must never roll back normal notification storage.
+            healthReporter.recordFailure()
+            // Payment derivation remains additive: normal notification storage has already succeeded.
         }
     }
 }
