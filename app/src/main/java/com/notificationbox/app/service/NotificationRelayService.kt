@@ -64,9 +64,14 @@ class NotificationRelayService : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         val reporter = NotificationIngestionHealthStore
+        val container = (application as App).container
         commandQueue = NotificationCommandQueue(
             scope = serviceScope,
-            processor = NotificationCommandProcessor(repository, reporter),
+            processor = NotificationCommandProcessor(
+                repository = repository,
+                healthReporter = reporter,
+                paymentSink = container.paymentNotificationSink
+            ),
             healthReporter = reporter,
             onOverflow = rebindCoordinator::request
         )
