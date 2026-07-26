@@ -5,6 +5,8 @@ This runbook defines the exact sequence for internal testing, closed testing, an
 ## Release scope
 
 - Product position: on-device notification history and classification preview beta
+
+When a GitHub Release is published with a `v*` tag, `Attach Android APK to GitHub Release` validates that tag and attaches an explicitly named unsigned APK plus its SHA-256 checksum. This asset is for development/internal use only and is not a signed production artifact.
 - Package: `com.notificationbox.app`
 - Version name: `0.1.0`
 - Version code: `1`

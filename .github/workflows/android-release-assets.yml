@@ -1,0 +1,67 @@
+name: Attach Android APK to GitHub Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-assets-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-attach:
+    if: ${{ startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout published tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v5.0.0
+        with:
+          cache-read-only: true
+
+      - name: Verify release build
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon
+          bash .github/scripts/verify-release-manifest.sh
+
+      - name: Prepare unsigned APK asset
+        id: asset
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          apk="$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          test -n "$apk"
+          release_sha="$(git rev-parse HEAD)"
+          asset="notification-box-${RELEASE_TAG}-${release_sha:0:12}-unsigned.apk"
+          cp "$apk" "$RUNNER_TEMP/$asset"
+          sha256sum "$RUNNER_TEMP/$asset" > "$RUNNER_TEMP/$asset.sha256"
+          {
+            echo "asset=$asset"
+            echo "asset_path=$RUNNER_TEMP/$asset"
+            echo "checksum_path=$RUNNER_TEMP/$asset.sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attach APK and checksum to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          APK_PATH: ${{ steps.asset.outputs.asset_path }}
+          CHECKSUM_PATH: ${{ steps.asset.outputs.checksum_path }}
+        run: |
+          gh release upload "$RELEASE_TAG" "$APK_PATH" "$CHECKSUM_PATH" --clobber --repo "$GITHUB_REPOSITORY"
