@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.notificationbox.app.data.repository.PaymentEvent
 import com.notificationbox.app.data.repository.PaymentRepository
 import com.notificationbox.app.data.repository.PaymentSummary
+import com.notificationbox.app.domain.payment.PaymentTransactionType
 import com.notificationbox.app.service.PaymentIngestionHealth
 import com.notificationbox.app.service.PaymentIngestionHealthReporter
 import com.notificationbox.app.service.PaymentIngestionHealthStore
@@ -77,6 +78,16 @@ class PaymentViewModel(
                 throw error
             } catch (_: Exception) {
                 mutableClearFailed.value = true
+            }
+        }
+    }
+
+    fun correctTransactionType(event: PaymentEvent, transactionType: PaymentTransactionType) {
+        viewModelScope.launch {
+            try {
+                repository.updateTransactionType(event.sourceNotificationKey, transactionType)
+            } catch (error: CancellationException) {
+                throw error
             }
         }
     }

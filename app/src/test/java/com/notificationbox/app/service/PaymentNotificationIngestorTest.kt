@@ -80,12 +80,22 @@ class PaymentNotificationIngestorTest {
         override suspend fun upsert(record: PaymentEventRecord) {
             recorded = record
         }
+
+        override suspend fun updateTransactionType(
+            sourceNotificationKey: String,
+            transactionType: com.notificationbox.app.domain.payment.PaymentTransactionType
+        ) = Unit
     }
 
     private class FailingPaymentRepository : BasePaymentRepository() {
         override suspend fun upsert(record: PaymentEventRecord) {
             error("synthetic storage failure")
         }
+
+        override suspend fun updateTransactionType(
+            sourceNotificationKey: String,
+            transactionType: com.notificationbox.app.domain.payment.PaymentTransactionType
+        ) = Unit
     }
 
     private abstract class BasePaymentRepository : PaymentRepository {

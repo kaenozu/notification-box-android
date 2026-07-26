@@ -48,5 +48,7 @@ interface PaymentRepository {
 
     suspend fun upsert(record: PaymentEventRecord)
 
+    suspend fun updateTransactionType(sourceNotificationKey: String, transactionType: PaymentTransactionType)
+
     suspend fun clearAll()
 }

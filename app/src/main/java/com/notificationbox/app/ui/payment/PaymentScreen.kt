@@ -48,6 +48,7 @@ fun PaymentRoute(
         uiState = uiState,
         clearFailed = clearFailed,
         onClearAll = viewModel::clearAll,
+        onCorrectTransactionType = viewModel::correctTransactionType,
         modifier = modifier
     )
 }
@@ -57,6 +58,7 @@ fun PaymentScreen(
     uiState: PaymentUiState,
     clearFailed: Boolean = false,
     onClearAll: () -> Unit = {},
+    onCorrectTransactionType: (PaymentEvent, PaymentTransactionType) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     when (uiState) {
@@ -79,6 +81,7 @@ fun PaymentScreen(
             ingestionHealth = uiState.ingestionHealth,
             clearFailed = clearFailed,
             onClearAll = onClearAll,
+            onCorrectTransactionType = onCorrectTransactionType,
             modifier = modifier
         )
     }
@@ -91,6 +94,7 @@ private fun PaymentContent(
     ingestionHealth: PaymentIngestionHealth,
     clearFailed: Boolean,
     onClearAll: () -> Unit,
+    onCorrectTransactionType: (PaymentEvent, PaymentTransactionType) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
@@ -187,7 +191,7 @@ private fun PaymentContent(
                 items = events,
                 key = PaymentEvent::sourceNotificationKey
             ) { event ->
-                PaymentEventCard(event)
+                PaymentEventCard(event, onCorrectTransactionType)
             }
             item {
                 OutlinedButton(
@@ -218,7 +222,36 @@ private fun PaymentContent(
 }
 
 @Composable
-private fun PaymentEventCard(event: PaymentEvent) {
+private fun PaymentEventCard(
+    event: PaymentEvent,
+    onCorrectTransactionType: (PaymentEvent, PaymentTransactionType) -> Unit
+) {
+    var showCorrectionDialog by rememberSaveable { mutableStateOf(false) }
+    if (showCorrectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showCorrectionDialog = false },
+            title = { Text(stringResource(R.string.payment_correct_type_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(
+                        PaymentTransactionType.PURCHASE,
+                        PaymentTransactionType.REFUND,
+                        PaymentTransactionType.CHARGE,
+                        PaymentTransactionType.TRANSFER_OUT,
+                        PaymentTransactionType.TRANSFER_IN
+                    ).forEach { type ->
+                        TextButton(onClick = {
+                            showCorrectionDialog = false
+                            onCorrectTransactionType(event, type)
+                        }) {
+                            Text(type.label())
+                        }
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -257,6 +290,9 @@ private fun PaymentEventCard(event: PaymentEvent) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
+            }
+            OutlinedButton(onClick = { showCorrectionDialog = true }) {
+                Text(stringResource(R.string.payment_correct_type_action))
             }
         }
     }

@@ -41,6 +41,9 @@ interface PaymentEventDao {
     @Upsert
     suspend fun upsert(entity: PaymentEventEntity)
 
+    @Query("UPDATE payment_events SET transactionType = :transactionType, status = 'CORRECTED' WHERE sourceNotificationKey = :sourceNotificationKey")
+    suspend fun updateTransactionType(sourceNotificationKey: String, transactionType: String)
+
     @Query("DELETE FROM payment_events")
     suspend fun clearAll()
 }
