@@ -24,6 +24,7 @@ os_notification_operations: NOT_IMPLEMENTED
 room_schema_version: 4
 payment_inbox: IMPLEMENTED_BETA
 payment_parser: PAYPAY_ONLY
+payment_correction: IMPLEMENTED
 payment_event_retention: USER_CONTROLLED
 payment_csv_export: NOT_IMPLEMENTED
 payment_cloud_sync: NOT_IMPLEMENTED
