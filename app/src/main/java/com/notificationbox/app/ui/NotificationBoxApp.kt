@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.notificationbox.app.ui.payment.PaymentViewModel
+import com.notificationbox.app.ui.payment.PaymentViewModelFactory
 import com.notificationbox.app.ui.summary.NotificationSummaryViewModel
 import com.notificationbox.app.ui.summary.NotificationSummaryViewModelFactory
 import com.notificationbox.app.ui.theme.NotificationBoxTheme
@@ -25,7 +27,11 @@ fun NotificationBoxApp(
     factory: NotificationBoxViewModelFactory,
     vm: NotificationBoxViewModel = viewModel(factory = factory)
 ) {
-    NotificationBoxAppContent(vm = vm, summaryViewModel = null)
+    NotificationBoxAppContent(
+        vm = vm,
+        summaryViewModel = null,
+        paymentViewModel = null
+    )
 }
 
 @Composable
@@ -35,13 +41,34 @@ fun NotificationBoxApp(
     vm: NotificationBoxViewModel = viewModel(factory = notificationFactory),
     summaryViewModel: NotificationSummaryViewModel = viewModel(factory = summaryFactory)
 ) {
-    NotificationBoxAppContent(vm = vm, summaryViewModel = summaryViewModel)
+    NotificationBoxAppContent(
+        vm = vm,
+        summaryViewModel = summaryViewModel,
+        paymentViewModel = null
+    )
+}
+
+@Composable
+fun NotificationBoxApp(
+    notificationFactory: NotificationBoxViewModelFactory,
+    summaryFactory: NotificationSummaryViewModelFactory,
+    paymentFactory: PaymentViewModelFactory,
+    vm: NotificationBoxViewModel = viewModel(factory = notificationFactory),
+    summaryViewModel: NotificationSummaryViewModel = viewModel(factory = summaryFactory),
+    paymentViewModel: PaymentViewModel = viewModel(factory = paymentFactory)
+) {
+    NotificationBoxAppContent(
+        vm = vm,
+        summaryViewModel = summaryViewModel,
+        paymentViewModel = paymentViewModel
+    )
 }
 
 @Composable
 private fun NotificationBoxAppContent(
     vm: NotificationBoxViewModel,
-    summaryViewModel: NotificationSummaryViewModel?
+    summaryViewModel: NotificationSummaryViewModel?,
+    paymentViewModel: PaymentViewModel?
 ) {
     val settingsRules by vm.settingsRulesState.collectAsStateWithLifecycle()
     val operationMessage by vm.operationMessage.collectAsStateWithLifecycle()
@@ -76,7 +103,11 @@ private fun NotificationBoxAppContent(
                     }
 
                     summaryViewModel == null -> Phase1NotificationBoxScreen(vm)
-                    else -> NotificationHomeScreen(vm, summaryViewModel)
+                    else -> NotificationHomeScreen(
+                        notificationViewModel = vm,
+                        summaryViewModel = summaryViewModel,
+                        paymentViewModel = paymentViewModel
+                    )
                 }
             }
             SnackbarHost(

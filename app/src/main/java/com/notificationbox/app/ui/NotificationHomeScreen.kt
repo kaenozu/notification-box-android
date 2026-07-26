@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
@@ -21,18 +22,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.notificationbox.app.R
+import com.notificationbox.app.ui.payment.PaymentRoute
+import com.notificationbox.app.ui.payment.PaymentViewModel
 import com.notificationbox.app.ui.summary.NotificationSummaryRoute
 import com.notificationbox.app.ui.summary.NotificationSummaryViewModel
 
 private enum class RootDestination {
     Notifications,
+    Payments,
     Summary
 }
 
 @Composable
 fun NotificationHomeScreen(
     notificationViewModel: NotificationBoxViewModel,
-    summaryViewModel: NotificationSummaryViewModel
+    summaryViewModel: NotificationSummaryViewModel,
+    paymentViewModel: PaymentViewModel? = null
 ) {
     var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
     val selected = RootDestination.entries[selectedIndex]
@@ -51,6 +56,19 @@ fun NotificationHomeScreen(
                     },
                     label = { Text(stringResource(R.string.notification_root_notifications)) }
                 )
+                if (paymentViewModel != null) {
+                    NavigationBarItem(
+                        selected = selected == RootDestination.Payments,
+                        onClick = { selectedIndex = RootDestination.Payments.ordinal },
+                        icon = {
+                            Icon(
+                                Icons.Filled.CreditCard,
+                                contentDescription = null
+                            )
+                        },
+                        label = { Text(stringResource(R.string.notification_root_payments)) }
+                    )
+                }
                 NavigationBarItem(
                     selected = selected == RootDestination.Summary,
                     onClick = { selectedIndex = RootDestination.Summary.ordinal },
@@ -73,6 +91,11 @@ fun NotificationHomeScreen(
             when (selected) {
                 RootDestination.Notifications -> {
                     Phase1NotificationBoxScreen(notificationViewModel)
+                }
+
+                RootDestination.Payments -> {
+                    paymentViewModel?.let { PaymentRoute(it) }
+                        ?: Phase1NotificationBoxScreen(notificationViewModel)
                 }
 
                 RootDestination.Summary -> {

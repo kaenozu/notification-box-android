@@ -33,7 +33,7 @@ class NotificationDatabaseMigrationTest {
     }
 
     @Test
-    fun `migration one to three preserves notifications and creates rule tables`() = runTest {
+    fun `migration one to four preserves notifications and creates extension tables`() = runTest {
         context.openOrCreateDatabase(databaseName, Context.MODE_PRIVATE, null).use { legacy ->
             legacy.execSQL(
                 """
@@ -87,7 +87,8 @@ class NotificationDatabaseMigrationTest {
         )
             .addMigrations(
                 NotificationDatabase.MIGRATION_1_2,
-                NotificationDatabase.MIGRATION_2_3
+                NotificationDatabase.MIGRATION_2_3,
+                NotificationDatabase.MIGRATION_3_4
             )
             .allowMainThreadQueries()
             .build()
@@ -119,6 +120,25 @@ class NotificationDatabaseMigrationTest {
             assertEquals(
                 1L,
                 migrated.classificationStatsDao().observeAll().first().single().count
+            )
+
+            migrated.paymentEventDao().upsert(
+                PaymentEventEntity(
+                    sourceNotificationKey = "payment-key",
+                    packageName = "jp.ne.paypay.android.app",
+                    appLabel = "PayPay",
+                    amountYen = 1_280,
+                    merchantName = "Example Store",
+                    transactionType = "PURCHASE",
+                    occurredAtMillis = 3_000,
+                    parserId = "paypay",
+                    parserVersion = 2,
+                    confidencePercent = 95
+                )
+            )
+            assertEquals(
+                1_280L,
+                migrated.paymentEventDao().observeAll().first().single().amountYen
             )
         } finally {
             migrated.close()
