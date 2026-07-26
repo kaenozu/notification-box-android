@@ -32,6 +32,7 @@ import com.notificationbox.app.R
 import com.notificationbox.app.data.repository.PaymentEvent
 import com.notificationbox.app.data.repository.PaymentSummary
 import com.notificationbox.app.domain.payment.PaymentTransactionType
+import com.notificationbox.app.service.PaymentIngestionHealth
 import java.text.NumberFormat
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -76,6 +77,7 @@ fun PaymentScreen(
         is PaymentUiState.Content -> PaymentContent(
             events = uiState.events,
             summary = uiState.summary,
+            ingestionHealth = uiState.ingestionHealth,
             clearFailed = clearFailed,
             onClearAll = onClearAll,
             modifier = modifier
@@ -87,6 +89,7 @@ fun PaymentScreen(
 private fun PaymentContent(
     events: List<PaymentEvent>,
     summary: PaymentSummary,
+    ingestionHealth: PaymentIngestionHealth,
     clearFailed: Boolean,
     onClearAll: () -> Unit,
     modifier: Modifier = Modifier
@@ -160,6 +163,17 @@ private fun PaymentContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+        if (ingestionHealth.failedEvents > 0) {
+            item {
+                PaymentMessageCard(
+                    title = stringResource(R.string.payment_ingestion_warning_title),
+                    message = stringResource(
+                        R.string.payment_ingestion_warning_body,
+                        ingestionHealth.failedEvents
+                    )
+                )
             }
         }
         if (events.isEmpty()) {
