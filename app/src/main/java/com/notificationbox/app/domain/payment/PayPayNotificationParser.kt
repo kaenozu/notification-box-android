@@ -11,12 +11,20 @@ class PayPayNotificationParser : PaymentNotificationParser {
             Normalizer.Form.NFKC
         ).trim()
         if (normalized.isBlank()) return null
+        if (PROMOTION_KEYWORDS.any(normalized::contains)) return null
 
         val amount = extractAmount(normalized) ?: return null
         val transactionType = detectTransactionType(normalized)
+        if (
+            transactionType == PaymentTransactionType.UNKNOWN &&
+            GENERIC_TRANSACTION_KEYWORDS.none(normalized::contains)
+        ) {
+            return null
+        }
+
         val merchant = extractMerchant(normalized)
         val confidence = when {
-            transactionType == PaymentTransactionType.UNKNOWN -> 65
+            transactionType == PaymentTransactionType.UNKNOWN -> 60
             merchant != null -> 95
             else -> 85
         }
@@ -63,7 +71,7 @@ class PayPayNotificationParser : PaymentNotificationParser {
     companion object {
         const val PAYPAY_PACKAGE_NAME = "jp.ne.paypay.android.app"
         const val PARSER_ID = "paypay"
-        const val PARSER_VERSION = 1
+        const val PARSER_VERSION = 2
 
         private val YEN_SUFFIX_AMOUNT = Regex("([0-9][0-9,]*)\\s*円")
         private val YEN_PREFIX_AMOUNT = Regex("[¥￥]\\s*([0-9][0-9,]*)")
@@ -74,10 +82,18 @@ class PayPayNotificationParser : PaymentNotificationParser {
             "(?:^|\\n)([^\\n]{1,80}?)で(?:のお支払い|の支払い|決済|\\s*[¥￥]?[0-9])"
         )
 
+        private val PROMOTION_KEYWORDS = listOf(
+            "キャンペーン",
+            "クーポン",
+            "ポイント還元",
+            "抽選",
+            "当たる"
+        )
         private val REFUND_KEYWORDS = listOf("返金", "払い戻し", "取消", "キャンセル")
         private val CHARGE_KEYWORDS = listOf("チャージ", "残高に入金")
         private val TRANSFER_IN_KEYWORDS = listOf("受け取り", "受取", "受領")
         private val TRANSFER_OUT_KEYWORDS = listOf("送金", "送付")
-        private val PURCHASE_KEYWORDS = listOf("支払い", "お支払い", "決済", "利用")
+        private val PURCHASE_KEYWORDS = listOf("支払い", "お支払い", "決済")
+        private val GENERIC_TRANSACTION_KEYWORDS = listOf("取引完了", "取引を受け付け")
     }
 }
