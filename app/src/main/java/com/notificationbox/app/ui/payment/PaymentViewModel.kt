@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.notificationbox.app.data.repository.PaymentEvent
 import com.notificationbox.app.data.repository.PaymentRepository
 import com.notificationbox.app.data.repository.PaymentSummary
+import com.notificationbox.app.service.PaymentIngestionHealth
+import com.notificationbox.app.service.PaymentIngestionHealthReporter
+import com.notificationbox.app.service.PaymentIngestionHealthStore
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -24,7 +27,8 @@ sealed interface PaymentUiState {
 
     data class Content(
         val events: List<PaymentEvent>,
-        val summary: PaymentSummary
+        val summary: PaymentSummary,
+        val ingestionHealth: PaymentIngestionHealth
     ) : PaymentUiState
 
     data object Error : PaymentUiState
@@ -32,6 +36,7 @@ sealed interface PaymentUiState {
 
 class PaymentViewModel(
     private val repository: PaymentRepository,
+    healthReporter: PaymentIngestionHealthReporter = PaymentIngestionHealthStore,
     clock: Clock = Clock.systemUTC(),
     zoneId: ZoneId = ZoneId.systemDefault()
 ) : ViewModel() {
@@ -46,9 +51,14 @@ class PaymentViewModel(
     val uiState: StateFlow<PaymentUiState> =
         combine(
             repository.observeEvents(),
-            repository.observeSummarySince(periodStart)
-        ) { events, summary ->
-            PaymentUiState.Content(events = events, summary = summary)
+            repository.observeSummarySince(periodStart),
+            healthReporter.health
+        ) { events, summary, health ->
+            PaymentUiState.Content(
+                events = events,
+                summary = summary,
+                ingestionHealth = health
+            )
         }
             .catch { emit(PaymentUiState.Error) }
             .stateIn(
@@ -76,12 +86,16 @@ class PaymentViewModel(
 }
 
 class PaymentViewModelFactory(
-    private val repository: PaymentRepository
+    private val repository: PaymentRepository,
+    private val healthReporter: PaymentIngestionHealthReporter = PaymentIngestionHealthStore
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(PaymentViewModel::class.java)) {
-            return PaymentViewModel(repository) as T
+            return PaymentViewModel(
+                repository = repository,
+                healthReporter = healthReporter
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: " + modelClass.name)
     }
