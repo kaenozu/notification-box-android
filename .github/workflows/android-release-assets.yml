@@ -36,7 +36,7 @@ jobs:
       - name: Verify release build
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon
+          ./gradlew testDebugUnitTest lintRelease assembleDebug assembleRelease --no-daemon
           bash .github/scripts/verify-release-manifest.sh
 
       - name: Prepare unsigned APK asset
@@ -57,11 +57,30 @@ jobs:
             echo "checksum_path=$RUNNER_TEMP/$asset.sha256"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Prepare installable debug APK asset
+        id: debug_asset
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          apk="$(find app/build/outputs/apk/debug -type f -name '*.apk' | head -n 1)"
+          test -n "$apk"
+          release_sha="$(git rev-parse HEAD)"
+          asset="notification-box-${RELEASE_TAG}-${release_sha:0:12}-debug.apk"
+          cp "$apk" "$RUNNER_TEMP/$asset"
+          sha256sum "$RUNNER_TEMP/$asset" > "$RUNNER_TEMP/$asset.sha256"
+          {
+            echo "asset_path=$RUNNER_TEMP/$asset"
+            echo "checksum_path=$RUNNER_TEMP/$asset.sha256"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Attach APK and checksum to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           APK_PATH: ${{ steps.asset.outputs.asset_path }}
           CHECKSUM_PATH: ${{ steps.asset.outputs.checksum_path }}
+          DEBUG_APK_PATH: ${{ steps.debug_asset.outputs.asset_path }}
+          DEBUG_CHECKSUM_PATH: ${{ steps.debug_asset.outputs.checksum_path }}
         run: |
-          gh release upload "$RELEASE_TAG" "$APK_PATH" "$CHECKSUM_PATH" --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$RELEASE_TAG" "$APK_PATH" "$CHECKSUM_PATH" "$DEBUG_APK_PATH" "$DEBUG_CHECKSUM_PATH" --clobber --repo "$GITHUB_REPOSITORY"

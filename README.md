@@ -73,7 +73,7 @@ PRと通常の手動検証ではunsigned Release APK/AABだけを生成します
 
 署名付き候補は、GitHub Actionsの`Android Release Candidate`を`sign=true`で手動実行し、保護された`release-signing` Environmentの承認後にだけ生成します。署名対象は検証済みの現在の`main`完全SHAに限定され、署名工程ではリポジトリ内のGradleやスクリプトを実行しません。
 
-`v*`タグのGitHub Releaseを公開すると、`Attach Android APK to GitHub Release`が同じタグを検証して、開発・内部確認用のunsigned APKとSHA-256チェックサムをReleaseへ添付します。これは署名済み本番配布物ではありません。
+`v*`タグのGitHub Releaseを公開すると、`Attach Android APK to GitHub Release`が同じタグを検証して、開発・内部確認用のdebug署名APK、unsigned Release APK、および各SHA-256チェックサムをReleaseへ添付します。実機へインストールする場合は`-debug.apk`を使用してください。debug署名APKは本番配布物ではありません。
 
 APKとAABの署名検証が成功しなければ、署名付き成果物は作成されません。詳細は[`docs/release-runbook.md`](docs/release-runbook.md)を参照してください。
 
