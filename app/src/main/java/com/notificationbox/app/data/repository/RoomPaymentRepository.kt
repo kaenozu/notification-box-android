@@ -18,7 +18,7 @@ class RoomPaymentRepository(
 
     override fun observeEvents(): Flow<List<PaymentEvent>> =
         paymentEventDao.observeAll()
-            .map { entities -> entities.map(PaymentEventEntity::toModel) }
+            .map { entities -> entities.map { entity -> entity.toModel() } }
             .flowOn(Dispatchers.Default)
 
     override fun observeSummarySince(since: Instant): Flow<PaymentSummary> =
