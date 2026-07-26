@@ -7,14 +7,21 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -36,12 +43,20 @@ fun PaymentRoute(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    PaymentScreen(uiState = uiState, modifier = modifier)
+    val clearFailed by viewModel.clearFailed.collectAsStateWithLifecycle()
+    PaymentScreen(
+        uiState = uiState,
+        clearFailed = clearFailed,
+        onClearAll = viewModel::clearAll,
+        modifier = modifier
+    )
 }
 
 @Composable
 fun PaymentScreen(
     uiState: PaymentUiState,
+    clearFailed: Boolean = false,
+    onClearAll: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     when (uiState) {
@@ -61,6 +76,8 @@ fun PaymentScreen(
         is PaymentUiState.Content -> PaymentContent(
             events = uiState.events,
             summary = uiState.summary,
+            clearFailed = clearFailed,
+            onClearAll = onClearAll,
             modifier = modifier
         )
     }
@@ -70,8 +87,35 @@ fun PaymentScreen(
 private fun PaymentContent(
     events: List<PaymentEvent>,
     summary: PaymentSummary,
+    clearFailed: Boolean,
+    onClearAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showClearDialog by rememberSaveable { mutableStateOf(false) }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text(stringResource(R.string.payment_clear_title)) },
+            text = { Text(stringResource(R.string.payment_clear_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearDialog = false
+                        onClearAll()
+                    }
+                ) {
+                    Text(stringResource(R.string.common_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -131,6 +175,23 @@ private fun PaymentContent(
                 key = PaymentEvent::sourceNotificationKey
             ) { event ->
                 PaymentEventCard(event)
+            }
+            item {
+                OutlinedButton(
+                    onClick = { showClearDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.payment_clear_action))
+                }
+            }
+        }
+        if (clearFailed) {
+            item {
+                Text(
+                    text = stringResource(R.string.payment_clear_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
         item {
