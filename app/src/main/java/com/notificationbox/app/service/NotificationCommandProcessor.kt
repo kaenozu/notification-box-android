@@ -29,18 +29,28 @@ internal sealed interface NotificationCommand {
 
 internal class NotificationCommandProcessor(
     private val repository: NotificationRepository,
-    private val healthReporter: NotificationIngestionHealthReporter
+    private val healthReporter: NotificationIngestionHealthReporter,
+    private val paymentSink: PaymentNotificationSink = NoOpPaymentNotificationSink
 ) {
     suspend fun process(command: NotificationCommand) {
         try {
             when (command) {
-                is NotificationCommand.SynchronizeActive -> repository.synchronizeActive(
-                    activeKeys = command.activeKeys,
-                    notifications = command.notifications,
-                    synchronizedAtMillis = command.synchronizedAtMillis
-                )
+                is NotificationCommand.SynchronizeActive -> {
+                    repository.synchronizeActive(
+                        activeKeys = command.activeKeys,
+                        notifications = command.notifications,
+                        synchronizedAtMillis = command.synchronizedAtMillis
+                    )
+                    command.notifications.forEach { notification ->
+                        paymentSink.capture(notification)
+                    }
+                }
 
-                is NotificationCommand.Upsert -> repository.upsert(command.notification)
+                is NotificationCommand.Upsert -> {
+                    repository.upsert(command.notification)
+                    paymentSink.capture(command.notification)
+                }
+
                 is NotificationCommand.MarkRemoved -> repository.markRemoved(
                     key = command.key,
                     removedAtMillis = command.removedAtMillis

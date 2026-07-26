@@ -21,7 +21,14 @@ summary_room_aggregation: IMPLEMENTED
 action_sha_pinning: IMPLEMENTED
 issue_state_automation: IMPLEMENTED
 os_notification_operations: NOT_IMPLEMENTED
-room_schema_version: 3
+room_schema_version: 4
+payment_inbox: IMPLEMENTED_BETA
+payment_parser: PAYPAY_ONLY
+payment_correction: IMPLEMENTED
+payment_event_retention: USER_CONTROLLED
+payment_csv_export: NOT_IMPLEMENTED
+payment_cloud_sync: NOT_IMPLEMENTED
+payment_external_api: NOT_IMPLEMENTED
 physical_device_validation: NOT_RUN
 release: NOT_AUTHORIZED
 ```

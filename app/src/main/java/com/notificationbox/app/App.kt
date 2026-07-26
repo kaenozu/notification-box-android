@@ -4,13 +4,17 @@ import android.app.Application
 import com.notificationbox.app.data.NotificationPreferences
 import com.notificationbox.app.data.db.NotificationDatabase
 import com.notificationbox.app.data.repository.NotificationRepository
+import com.notificationbox.app.data.repository.PaymentRepository
 import com.notificationbox.app.data.repository.RoomNotificationRepository
+import com.notificationbox.app.data.repository.RoomPaymentRepository
 import com.notificationbox.app.data.settings.DataStoreSettingsRepository
 import com.notificationbox.app.data.settings.SettingsRepository
 import com.notificationbox.app.permission.AndroidNotificationPermissionPlatform
 import com.notificationbox.app.permission.AndroidPermissionStatusProvider
 import com.notificationbox.app.permission.NotificationPermissionPlatform
 import com.notificationbox.app.permission.PermissionStatusProvider
+import com.notificationbox.app.service.PaymentNotificationIngestor
+import com.notificationbox.app.service.PaymentNotificationSink
 import com.notificationbox.app.ui.AndroidNotificationContentPresenter
 import com.notificationbox.app.ui.NotificationContentPresenter
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +37,10 @@ class AppContainer(
     )
     val notificationRepository: NotificationRepository =
         RoomNotificationRepository(database = database)
+    val paymentRepository: PaymentRepository =
+        RoomPaymentRepository(database = database)
+    val paymentNotificationSink: PaymentNotificationSink =
+        PaymentNotificationIngestor(repository = paymentRepository)
     val notificationContentPresenter: NotificationContentPresenter =
         AndroidNotificationContentPresenter(app)
 }

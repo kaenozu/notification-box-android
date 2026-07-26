@@ -135,8 +135,8 @@ connection = sqlite3.connect(path)
 connection.row_factory = sqlite3.Row
 try:
     user_version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if user_version != 3:
-        raise AssertionError(f"expected user_version 3, got {user_version}")
+    if user_version != 4:
+        raise AssertionError(f"expected user_version 4, got {user_version}")
 
     row = connection.execute(
         """
@@ -167,7 +167,12 @@ try:
             "SELECT name FROM sqlite_master WHERE type = 'table'"
         )
     }
-    required_tables = {"notifications", "app_rules", "classification_stats"}
+    required_tables = {
+        "notifications",
+        "app_rules",
+        "classification_stats",
+        "payment_events",
+    }
     missing = required_tables - tables
     if missing:
         raise AssertionError(f"missing tables: {sorted(missing)}")
@@ -181,6 +186,35 @@ try:
     connection.execute(
         "INSERT INTO classification_stats(`key`, count) VALUES('synthetic.total', 1)"
     )
+    connection.execute(
+        """
+        INSERT INTO payment_events(
+            sourceNotificationKey,
+            packageName,
+            appLabel,
+            amountYen,
+            merchantName,
+            transactionType,
+            occurredAtMillis,
+            parserId,
+            parserVersion,
+            confidencePercent,
+            status
+        ) VALUES(
+            'installed-payment',
+            'jp.ne.paypay.android.app',
+            'PayPay',
+            1280,
+            'Synthetic Store',
+            'PURCHASE',
+            3000,
+            'paypay',
+            1,
+            95,
+            'UNREVIEWED'
+        )
+        """
+    )
     connection.commit()
 
     rule = connection.execute(
@@ -189,19 +223,26 @@ try:
     stat = connection.execute(
         "SELECT count FROM classification_stats WHERE `key` = 'synthetic.total'"
     ).fetchone()
+    payment = connection.execute(
+        "SELECT amountYen, transactionType FROM payment_events "
+        "WHERE sourceNotificationKey = 'installed-payment'"
+    ).fetchone()
     if rule is None or rule[0] != "Ignore":
         raise AssertionError("app_rules write validation failed")
     if stat is None or stat[0] != 1:
         raise AssertionError("classification_stats write validation failed")
+    if payment is None or payment[0] != 1280 or payment[1] != "PURCHASE":
+        raise AssertionError("payment_events write validation failed")
 
     with open(result_path, "a", encoding="utf-8") as output:
-        output.write("PASS: database user_version is 3\n")
+        output.write("PASS: database user_version is 4\n")
         output.write("PASS: installed v1 notification data preserved\n")
         output.write("PASS: installed v1 pin state preserved\n")
         output.write("PASS: existing userDecision is NULL\n")
         output.write("PASS: existing contentAvailability is AVAILABLE\n")
         output.write("PASS: app_rules table is writable\n")
         output.write("PASS: classification_stats table is writable\n")
+        output.write("PASS: payment_events table is writable\n")
 finally:
     connection.close()
 PY

@@ -11,15 +11,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         NotificationEntity::class,
         AppRuleEntity::class,
-        ClassificationStatEntity::class
+        ClassificationStatEntity::class,
+        PaymentEventEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class NotificationDatabase : RoomDatabase() {
     abstract fun notificationDao(): NotificationDao
     abstract fun appRuleDao(): AppRuleDao
     abstract fun classificationStatsDao(): ClassificationStatsDao
+    abstract fun paymentEventDao(): PaymentEventDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -61,13 +63,48 @@ abstract class NotificationDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS payment_events (
+                        sourceNotificationKey TEXT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        appLabel TEXT NOT NULL,
+                        amountYen INTEGER NOT NULL,
+                        merchantName TEXT,
+                        transactionType TEXT NOT NULL,
+                        occurredAtMillis INTEGER NOT NULL,
+                        parserId TEXT NOT NULL,
+                        parserVersion INTEGER NOT NULL,
+                        confidencePercent INTEGER NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'UNREVIEWED',
+                        PRIMARY KEY(sourceNotificationKey)
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_payment_events_occurredAtMillis " +
+                        "ON payment_events(occurredAtMillis)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_payment_events_packageName " +
+                        "ON payment_events(packageName)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_payment_events_transactionType " +
+                        "ON payment_events(transactionType)"
+                )
+            }
+        }
+
         fun create(context: Context): NotificationDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 NotificationDatabase::class.java,
                 "notification-box.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }
