@@ -56,7 +56,31 @@ class PayPayNotificationParserTest {
         val result = parser.parse(
             input(
                 title = "PayPayからのお知らせ",
-                text = "新しいキャンペーンを確認できます"
+                text = "新しいお知らせを確認できます"
+            )
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `ignores promotion even when it contains yen amount`() {
+        val result = parser.parse(
+            input(
+                title = "キャンペーンのお知らせ",
+                text = "抽選で10,000円相当のポイントが当たる"
+            )
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `ignores ambiguous amount without transaction wording`() {
+        val result = parser.parse(
+            input(
+                title = "残高のお知らせ",
+                text = "現在の残高は3,000円です"
             )
         )
 
