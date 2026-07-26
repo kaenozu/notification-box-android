@@ -47,4 +47,6 @@ interface PaymentRepository {
     fun observeSummarySince(since: Instant): Flow<PaymentSummary>
 
     suspend fun upsert(record: PaymentEventRecord)
+
+    suspend fun clearAll()
 }
