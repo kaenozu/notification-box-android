@@ -37,6 +37,10 @@ class RoomPaymentRepository(
         paymentEventDao.upsert(record.toEntity())
     }
 
+    override suspend fun clearAll() {
+        paymentEventDao.clearAll()
+    }
+
     private fun PaymentEventRecord.toEntity(): PaymentEventEntity =
         PaymentEventEntity(
             sourceNotificationKey = sourceNotificationKey,
