@@ -7,7 +7,13 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PaymentEventDao {
-    @Query("SELECT * FROM payment_events ORDER BY occurredAtMillis DESC, sourceNotificationKey DESC")
+    @Query(
+        """
+        SELECT * FROM payment_events
+        ORDER BY occurredAtMillis DESC, sourceNotificationKey DESC
+        LIMIT 500
+        """
+    )
     fun observeAll(): Flow<List<PaymentEventEntity>>
 
     @Query(
@@ -34,4 +40,7 @@ interface PaymentEventDao {
 
     @Upsert
     suspend fun upsert(entity: PaymentEventEntity)
+
+    @Query("DELETE FROM payment_events")
+    suspend fun clearAll()
 }
