@@ -89,6 +89,11 @@ powershell -ExecutionPolicy Bypass -File tools/physical-device-validation.ps1 `
 
 このスクリプトは通知本文や生の通知識別子を取得せず、端末情報と手動チェックリストだけを生成します。
 
+## 仕様・設計文書
+
+- [`docs/payment-inbox-spec-ja.md`](docs/payment-inbox-spec-ja.md) — 決済インボックスの目的、スコープ、機能・非機能要件、受入基準
+- [`docs/payment-inbox-design-ja.md`](docs/payment-inbox-design-ja.md) — 解析、永続化、障害分離、UI、migration、テストの設計
+
 ## リリース文書
 
 - [`docs/release-runbook.md`](docs/release-runbook.md)
