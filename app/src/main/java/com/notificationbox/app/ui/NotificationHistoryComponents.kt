@@ -250,12 +250,15 @@ internal fun NotificationCard(
                 stringResource(R.string.notification_classification_heading),
                 style = MaterialTheme.typography.labelLarge
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 NotificationDecision.entries.forEach { decision ->
                     FilterChip(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 52.dp),
                         selected = item.userDecision == decision,
                         onClick = { onDecision(decision) },
                         label = { Text(decision.displayName()) }
