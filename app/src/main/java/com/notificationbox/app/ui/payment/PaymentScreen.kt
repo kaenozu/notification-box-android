@@ -156,6 +156,14 @@ private fun PaymentContent(
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    PaymentSummaryRow(
+                        label = stringResource(R.string.payment_purchase_total),
+                        value = summary.purchaseTotalYen.asYen()
+                    )
+                    PaymentSummaryRow(
+                        label = stringResource(R.string.payment_refund_total),
+                        value = summary.refundTotalYen.asYen()
+                    )
                     Text(
                         text = stringResource(
                             R.string.payment_summary_detail,
@@ -218,6 +226,17 @@ private fun PaymentContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun PaymentSummaryRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

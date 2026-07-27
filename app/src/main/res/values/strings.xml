@@ -125,6 +125,8 @@
     <string name="payment_title">決済インボックス（ベータ）</string>
     <string name="payment_beta_note">現在はPayPayの通知だけを端末内で試験解析します。通知にない情報は取得できません。</string>
     <string name="payment_monthly_net">今月の推定支出</string>
+    <string name="payment_purchase_total">支払い合計</string>
+    <string name="payment_refund_total">返金合計</string>
     <string name="payment_summary_detail">解析済み %1$d件・要確認 %2$d件</string>
     <string name="payment_empty_title">解析できる決済通知はまだありません</string>
     <string name="payment_empty_body">PayPayの支払い・返金・チャージ通知を受信すると、解析できた項目だけここに表示します。</string>
