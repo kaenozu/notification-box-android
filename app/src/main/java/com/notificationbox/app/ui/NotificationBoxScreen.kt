@@ -53,6 +53,11 @@ private enum class HomeSection {
     AppRules
 }
 
+private data class NotificationInsight(
+    val label: String,
+    val items: List<NotificationItem>
+)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
@@ -79,6 +84,22 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
             val matchesQuery = normalizedQuery.isEmpty() || searchableText.contains(normalizedQuery)
             matchesFilter && matchesQuery
         }
+    }
+    val insights = remember(history.items) {
+        listOf(
+            NotificationInsight(
+                label = "配送・到着",
+                items = history.items.filter { it.searchableText().containsAny("配送", "お届け", "到着") }
+            ),
+            NotificationInsight(
+                label = "予約・予定",
+                items = history.items.filter { it.searchableText().containsAny("予約", "予定", "受付") }
+            ),
+            NotificationInsight(
+                label = "期限・認証",
+                items = history.items.filter { it.searchableText().containsAny("期限", "有効", "認証", "コード") }
+            )
+        ).filter { it.items.isNotEmpty() }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -243,6 +264,9 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                         }
                     )
                 }
+                if (insights.isNotEmpty()) {
+                    item { NotificationInsightsCard(insights) }
+                }
             }
             if (history.readFailed || settingsRules.readFailed) {
                 item { RepositoryReadRecoveryCard() }
@@ -363,6 +387,49 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
         }
     }
 }
+
+@Composable
+private fun NotificationInsightsCard(insights: List<NotificationInsight>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.notification_insights_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = stringResource(R.string.notification_insights_body),
+                style = MaterialTheme.typography.bodySmall
+            )
+            insights.forEach { insight ->
+                Text(
+                    text = "${insight.label} ${insight.items.size}件",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                insight.items.take(2).forEach { item ->
+                    Text(
+                        text = "・${item.title ?: item.appLabel}",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun NotificationItem.searchableText(): String =
+    listOfNotNull(appLabel, title, text).joinToString(" ").lowercase()
+
+private fun String.containsAny(vararg values: String): Boolean =
+    values.any { contains(it.lowercase()) }
 
 @Composable
 private fun RepositoryReadRecoveryCard() {

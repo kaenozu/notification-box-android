@@ -50,6 +50,8 @@
 
     <string name="notification_search_label">通知を検索</string>
     <string name="notification_search_placeholder">アプリ名、タイトル、本文を検索</string>
+    <string name="notification_insights_title">通知から見つかった情報</string>
+    <string name="notification_insights_body">配送・予約・期限などを端末内で判定しています。通知の分類や検索に使えます。</string>
 
     <string name="notification_title_missing">タイトルなし</string>
     <string name="notification_pin">ピン留め</string>
