@@ -1,5 +1,9 @@
 package com.notificationbox.app.ui
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -22,6 +26,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -47,6 +52,7 @@ import com.notificationbox.app.R
 import com.notificationbox.app.model.AppRule
 import com.notificationbox.app.model.NotificationDecision
 import com.notificationbox.app.model.NotificationItem
+import com.notificationbox.app.service.DigestReminderScheduler
 
 private enum class HomeSection {
     Notifications,
@@ -62,6 +68,12 @@ private data class NotificationInsight(
 @Composable
 fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     val context = LocalContext.current
+    val digestReminderScheduler = remember(context) { DigestReminderScheduler(context) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) digestReminderScheduler.scheduleInOneHour()
+    }
     val history by vm.historyState.collectAsStateWithLifecycle()
     val settingsRules by vm.settingsRulesState.collectAsStateWithLifecycle()
     var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -248,6 +260,23 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                 )
             }
             item { SafetyNoticeCard() }
+            val holdForDigestCount = history.items.count {
+                it.isActive && it.category == NotificationDecision.HoldForDigest
+            }
+            if (holdForDigestCount > 0) {
+                item {
+                    DigestReminderCard(
+                        count = holdForDigestCount,
+                        onSchedule = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                digestReminderScheduler.scheduleInOneHour()
+                            }
+                        }
+                    )
+                }
+            }
             if (selectedSection == HomeSection.Notifications) {
                 item {
                     OutlinedTextField(
@@ -420,6 +449,36 @@ private fun NotificationInsightsCard(insights: List<NotificationInsight>) {
                         maxLines = 1
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DigestReminderCard(count: Int, onSchedule: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.digest_reminder_card_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = stringResource(R.string.digest_reminder_card_body, count),
+                style = MaterialTheme.typography.bodySmall
+            )
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onSchedule
+            ) {
+                Text(stringResource(R.string.digest_reminder_schedule_action))
             }
         }
     }

@@ -52,6 +52,12 @@
     <string name="notification_search_placeholder">アプリ名、タイトル、本文を検索</string>
     <string name="notification_insights_title">通知から見つかった情報</string>
     <string name="notification_insights_body">配送・予約・期限などを端末内で判定しています。通知の分類や検索に使えます。</string>
+    <string name="digest_reminder_card_title">あとで確認する通知</string>
+    <string name="digest_reminder_card_body">現在 %1$d件あります。1時間後に件数だけ通知します。</string>
+    <string name="digest_reminder_schedule_action">1時間後に知らせる</string>
+    <string name="digest_reminder_channel_name">あとで確認</string>
+    <string name="digest_reminder_title">通知箱：あとで確認</string>
+    <string name="digest_reminder_body">あとで確認する通知が %1$d件あります。</string>
 
     <string name="notification_title_missing">タイトルなし</string>
     <string name="notification_pin">ピン留め</string>
