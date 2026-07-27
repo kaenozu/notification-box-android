@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -88,27 +89,43 @@ internal fun StatusCard(
                 ingestionHealthText(processed, failed, lastError),
                 style = MaterialTheme.typography.bodySmall
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Button(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+                onClick = onOpenListenerSettings
             ) {
-                Button(onClick = onOpenListenerSettings) {
-                    Text(
-                        stringResource(
-                            if (notificationAccessGranted) {
-                                R.string.notification_access_check
-                            } else {
-                                R.string.notification_access_setup
-                            }
-                        )
+                Text(
+                    stringResource(
+                        if (notificationAccessGranted) {
+                            R.string.notification_access_check
+                        } else {
+                            R.string.notification_access_setup
+                        }
                     )
-                }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 if (BuildConfig.DEBUG) {
-                    Button(onClick = onSeed) {
+                    Button(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp),
+                        onClick = onSeed
+                    ) {
                         Text(stringResource(R.string.notification_demo_add))
                     }
                 }
-                TextButton(onClick = onClearAll, enabled = hasItems) {
+                TextButton(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp),
+                    onClick = onClearAll,
+                    enabled = hasItems
+                ) {
                     Text(stringResource(R.string.notification_clear_all_action))
                 }
             }
