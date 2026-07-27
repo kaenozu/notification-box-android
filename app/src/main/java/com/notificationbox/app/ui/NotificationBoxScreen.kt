@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,6 +22,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,13 +63,21 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
     var showStatsResetConfirmation by rememberSaveable { mutableStateOf(false) }
     var showPrivacyInfo by rememberSaveable { mutableStateOf(false) }
     var selectedSectionIndex by rememberSaveable { mutableIntStateOf(0) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var appRuleTarget by remember { mutableStateOf<NotificationItem?>(null) }
     var deleteTarget by remember { mutableStateOf<NotificationItem?>(null) }
     val selectedSection = HomeSection.entries[selectedSectionIndex]
     val openListenerSettings = remember(context) { notificationListenerSettingsIntent(context) }
-    val filteredItems = remember(history.items, history.selectedFilter) {
+    val filteredItems = remember(history.items, history.selectedFilter, searchQuery) {
+        val query = searchQuery.trim()
+        val normalizedQuery = query.lowercase()
         history.items.filter {
-            history.selectedFilter == null || it.category == history.selectedFilter
+            val matchesFilter = history.selectedFilter == null || it.category == history.selectedFilter
+            val searchableText = listOfNotNull(it.appLabel, it.title, it.text)
+                .joinToString(" ")
+                .lowercase()
+            val matchesQuery = normalizedQuery.isEmpty() || searchableText.contains(normalizedQuery)
+            matchesFilter && matchesQuery
         }
     }
 
@@ -217,6 +227,23 @@ fun NotificationBoxScreen(vm: NotificationBoxViewModel) {
                 )
             }
             item { SafetyNoticeCard() }
+            if (selectedSection == HomeSection.Notifications) {
+                item {
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Filled.Search, contentDescription = null)
+                        },
+                        label = { Text(stringResource(R.string.notification_search_label)) },
+                        placeholder = {
+                            Text(stringResource(R.string.notification_search_placeholder))
+                        }
+                    )
+                }
+            }
             if (history.readFailed || settingsRules.readFailed) {
                 item { RepositoryReadRecoveryCard() }
             }

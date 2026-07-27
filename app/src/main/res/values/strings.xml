@@ -46,7 +46,10 @@
     <string name="notification_read_recovery_body">通知履歴、アプリ別ルール、または分類統計を一時的に読み込めませんでした。安全のため現在の表示を維持し、自動的に再試行します。</string>
 
     <string name="notification_safety_title">安全な観察・試算版</string>
-    <string name="notification_safety_body">このバージョンは元のOS通知を削除、抑制、スヌーズ、遅延しません。分類と整理プレビューだけを行います。</string>
+    <string name="notification_safety_body">通知は端末内に保存され、アプリ名・タイトル・本文で後から検索できます。元のOS通知は変更しません。</string>
+
+    <string name="notification_search_label">通知を検索</string>
+    <string name="notification_search_placeholder">アプリ名、タイトル、本文を検索</string>
 
     <string name="notification_title_missing">タイトルなし</string>
     <string name="notification_pin">ピン留め</string>
