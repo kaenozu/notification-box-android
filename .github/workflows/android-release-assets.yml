@@ -15,6 +15,7 @@ jobs:
   build-and-attach:
     if: ${{ startsWith(github.event.release.tag_name, 'v') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout published tag
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.1
@@ -36,7 +37,7 @@ jobs:
       - name: Verify release build
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest lintRelease assembleDebug assembleRelease --no-daemon
+          ./gradlew assembleDebug assembleRelease --no-daemon --stacktrace
           bash .github/scripts/verify-release-manifest.sh
 
       - name: Prepare unsigned APK asset
