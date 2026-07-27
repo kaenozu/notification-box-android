@@ -89,21 +89,15 @@ internal fun StatusCard(
                 ingestionHealthText(processed, failed, lastError),
                 style = MaterialTheme.typography.bodySmall
             )
-            Button(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 52.dp),
-                onClick = onOpenListenerSettings
-            ) {
-                Text(
-                    stringResource(
-                        if (notificationAccessGranted) {
-                            R.string.notification_access_check
-                        } else {
-                            R.string.notification_access_setup
-                        }
-                    )
-                )
+            if (!notificationAccessGranted) {
+                Button(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp),
+                    onClick = onOpenListenerSettings
+                ) {
+                    Text(stringResource(R.string.notification_access_setup))
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -28,7 +28,6 @@
     <string name="notification_status_title">通知を端末内で整理</string>
     <string name="notification_access_granted_body">通知アクセスは許可済みです。届いた通知を端末内の履歴へ反映します。</string>
     <string name="notification_access_missing_body">通知アクセスが未許可です。許可するまで通知内容は読み取りません。</string>
-    <string name="notification_access_check">通知アクセスを確認</string>
     <string name="notification_access_setup">通知アクセスを設定</string>
     <string name="notification_demo_add">デモ追加</string>
     <string name="notification_clear_all_action">履歴をすべて削除</string>
