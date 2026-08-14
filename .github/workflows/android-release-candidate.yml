@@ -74,6 +74,10 @@ jobs:
         shell: bash
         run: ./gradlew lintRelease --no-daemon
 
+      - name: Test AAB signature result gate
+        shell: bash
+        run: bash .github/scripts/tests/verify-jarsigner-result-test.sh
+
       - name: Build unsigned release artifacts
         shell: bash
         run: |
@@ -233,18 +237,13 @@ jobs:
             -signedjar "$signed_aab" \
             "$unsigned_aab" \
             "$KEY_ALIAS"
-          # Self-signed upload keys are normal; jarsigner -strict exits 4
-          # when warnings (self-signed cert) are present even though the
-          # signature verifies. Accept exit code 4, fail on real errors.
           set +e
           jarsigner -verify -strict -verbose "$signed_aab" \
             > "$output_dir/aab-signature-verification.txt" 2>&1
           verify_rc=$?
           set -e
-          if [ "$verify_rc" -ne 0 ] && [ "$verify_rc" -ne 4 ]; then
-            echo "AAB signature verification failed with exit code $verify_rc" >&2
-            exit 1
-          fi
+          bash .github/scripts/verify-jarsigner-result.sh \
+            "$verify_rc" "$output_dir/aab-signature-verification.txt"
 
           {
             echo "repository=kaenozu/notification-box-android"
